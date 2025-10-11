@@ -1,5 +1,7 @@
 import os
 import logging
+import html
+import re
 from flask import Flask, request, jsonify
 from sqlalchemy import create_engine, Table, Column, Integer, Text, TIMESTAMP, MetaData, select, func
 
@@ -39,13 +41,62 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+def sanitize_input(text: str) -> str:
+    """
+    Sanitize user input to prevent XSS attacks and other malicious content.
+    
+    Args:
+        text (str): Raw user input
+        
+    Returns:
+        str: Sanitized text safe for storage and display
+    """
+    if not text:
+        return text
+    
+    # First, escape HTML entities to prevent XSS
+    sanitized = html.escape(text)
+    
+    # Remove potentially dangerous patterns (while preserving escaped content)
+    # Remove any null bytes
+    sanitized = sanitized.replace('\x00', '')
+    
+    # Remove excessive whitespace but preserve single spaces
+    sanitized = re.sub(r'\s+', ' ', sanitized)
+    
+    # Strip leading/trailing whitespace
+    sanitized = sanitized.strip()
+    
+    return sanitized
+
 def validation(name: str):
-    name = name.strip()
-    if name == "":
+    """
+    Validate and sanitize user input for names.
+    
+    Args:
+        name (str): Raw name input from user
+        
+    Returns:
+        tuple: (is_valid: bool, result: str) where result is either sanitized name or error message
+    """
+    # Handle None input
+    if name is None:
         return False, "Name cannot be empty."
-    if len(name) > MAX_NAME_LENGTH:
+    
+    # First sanitize the input to prevent XSS
+    sanitized_name = sanitize_input(name)
+    
+    if sanitized_name == "":
+        return False, "Name cannot be empty."
+    
+    if len(sanitized_name) > MAX_NAME_LENGTH:
         return False, f"Max length is {MAX_NAME_LENGTH} characters."
-    return True, name
+    
+    # Log if sanitization changed the input (for security monitoring)
+    if name != sanitized_name:
+        logger.warning(f"Input sanitization applied: '{name}' -> '{sanitized_name}'")
+    
+    return True, sanitized_name
 
 @app.route("/api/names", methods=["POST"])
 def add_name():
