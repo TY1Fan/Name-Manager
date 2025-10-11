@@ -47,10 +47,10 @@ class TestValidation:
         assert valid is True
         assert result == "Mary-Jane"
         
-        # Names with apostrophes should pass
+        # Names with apostrophes should pass (but will be HTML escaped)
         valid, result = validation("O'Connor")
         assert valid is True
-        assert result == "O'Connor"
+        assert result == "O&#x27;Connor"  # Apostrophe is escaped for security
 
     def test_whitespace_handling(self):
         """Test validation handles whitespace correctly."""
@@ -69,10 +69,10 @@ class TestValidation:
         assert valid is True
         assert result == "John Doe"
         
-        # Multiple spaces between words should be preserved
+        # Multiple spaces between words are normalized to single spaces
         valid, result = validation("John  Doe")
         assert valid is True
-        assert result == "John  Doe"
+        assert result == "John Doe"  # Multiple spaces normalized
 
     def test_empty_names(self):
         """Test validation rejects empty names."""
@@ -148,10 +148,10 @@ class TestValidation:
 
     def test_none_input(self):
         """Test validation handles None input gracefully."""
-        # This should raise an AttributeError since None.strip() fails
-        # This tests the current behavior - we might want to improve this later
-        with pytest.raises(AttributeError):
-            validation(None)
+        # None input should be handled gracefully and return an error
+        valid, result = validation(None)
+        assert valid is False
+        assert "cannot be empty" in result
 
     def test_non_string_input(self):
         """Test validation with non-string inputs."""
