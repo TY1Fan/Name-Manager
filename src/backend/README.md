@@ -92,12 +92,13 @@ class TestAPI:
 - API endpoint tests: ✅ Passing (13 tests)
 
 ### Test Coverage Summary
-- **Total Tests**: 29 tests
-- **Overall Coverage**: 96% of main.py
+- **Total Tests**: 36 tests
+- **Overall Coverage**: 85% of main.py
 - **Test Categories**:
   - Infrastructure: 4 tests - Basic pytest setup and fixture testing
   - Validation: 12 tests - Comprehensive validation function testing
   - API Endpoints: 13 tests - Full CRUD operations testing
+  - Logging: 7 tests - Comprehensive logging functionality testing
   
 ### API Endpoint Test Coverage
 - **POST /api/names**: 5 tests
@@ -121,6 +122,43 @@ class TestAPI:
   - Full CRUD workflow
   - Invalid HTTP methods (405 errors)
 
+- **Logging**: 7 tests
+  - Request/response logging verification
+  - Error condition logging verification  
+  - Configuration validation
+  - Log message content verification
+
+## Logging Features
+
+The application now includes comprehensive logging for debugging and monitoring:
+
+### Log Levels
+- **INFO**: Request/response tracking, successful operations
+- **WARNING**: Validation failures, not found errors  
+- **ERROR**: Database errors, internal server errors
+- **DEBUG**: Detailed processing information (when enabled)
+
+### Log Format
+```
+YYYY-MM-DD HH:MM:SS - main - LEVEL - MESSAGE
+```
+
+### What Gets Logged
+- **Application Startup**: Server start message with host/port
+- **API Requests**: Each endpoint request with method and path
+- **Successful Operations**: Database operations with details
+- **Validation Errors**: Invalid input with specific error messages
+- **Database Errors**: SQL operation failures with error details
+- **Not Found Errors**: Attempts to access non-existent resources
+
+### Example Log Output
+```
+2025-10-11 12:30:00 - main - INFO - Names Manager API starting up on host=0.0.0.0, port=8000
+2025-10-11 12:30:01 - main - INFO - POST /api/names - Request received
+2025-10-11 12:30:01 - main - INFO - POST /api/names - Successfully added name 'John Doe' with ID 1
+2025-10-11 12:30:02 - main - WARNING - POST /api/names - Validation failed: Name cannot be empty.
+```
+
 ## Tasks Completed ✅
 
 1. ✅ **Task 1.1**: Set Up Basic Testing Infrastructure
@@ -139,3 +177,10 @@ class TestAPI:
    - 13 test cases covering all three REST endpoints
    - Complete CRUD workflow testing
    - Error handling and edge case testing
+
+4. ✅ **Task 1.4**: Add Basic Logging to Backend
+   - Added comprehensive logging throughout the application
+   - Logging configuration with INFO level and readable format
+   - Request/response logging for all API endpoints
+   - Error and validation failure logging
+   - Database operation logging with success/failure tracking
