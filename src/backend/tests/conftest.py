@@ -4,10 +4,22 @@ import os
 import sys
 
 # Mock the missing modules for testing without PostgreSQL
-class MockModule:
-    pass
+class MockPsycopg2:
+    paramstyle = 'pyformat'
+    
+    class extensions:
+        ISOLATION_LEVEL_AUTOCOMMIT = 0
+    
+    def connect(self, *args, **kwargs):
+        pass
 
-sys.modules['psycopg2'] = MockModule()
+sys.modules['psycopg2'] = MockPsycopg2()
+sys.modules['psycopg2.extensions'] = MockPsycopg2.extensions
+
+# Fix werkzeug version issue in Flask test client
+import werkzeug
+if not hasattr(werkzeug, '__version__'):
+    werkzeug.__version__ = '2.3.6'
 
 from sqlalchemy import create_engine, text
 
