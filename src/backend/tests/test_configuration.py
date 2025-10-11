@@ -86,7 +86,7 @@ class TestConfiguration:
     
     def test_configuration_documentation(self):
         """Test that .env.example file exists and contains expected variables."""
-        env_example_path = '/Users/tohyifan/HW_3/.env.example'
+        env_example_path = '/Users/tohyifan/HW_3/src/.env.example'
         assert os.path.exists(env_example_path), ".env.example file should exist"
         
         with open(env_example_path, 'r') as f:
