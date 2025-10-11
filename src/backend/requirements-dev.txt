@@ -1,0 +1,9 @@
+# Development dependencies for testing and development tools
+pytest==7.4.0
+pytest-cov==4.1.0
+pytest-flask==1.2.0
+
+# Production dependencies (excluding psycopg2 for local testing)
+flask==2.3.2
+gunicorn==20.1.0
+SQLAlchemy==2.0.19
