@@ -83,14 +83,79 @@
     button.delete-btn:hover {
       background: #ab2822;
     }
+
+    /* Error handling styles */
+    .error-message {
+      background: #ffebee;
+      color: #c62828;
+      border: 1px solid #ef5350;
+      border-radius: 4px;
+      padding: 12px;
+      margin: 10px 0;
+      font-size: 14px;
+      display: none;
+    }
+
+    .success-message {
+      background: #e8f5e8;
+      color: #2e7d32;
+      border: 1px solid #66bb6a;
+      border-radius: 4px;
+      padding: 12px;
+      margin: 10px 0;
+      font-size: 14px;
+      display: none;
+    }
+
+    .loading {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+
+    .loading button {
+      cursor: not-allowed;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid #f3f3f3;
+      border-top: 2px solid #007acc;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 5px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .input-error {
+      border-color: #e53935 !important;
+      background-color: #ffebee;
+    }
+
+    .field-error {
+      color: #c62828;
+      font-size: 12px;
+      margin-top: 4px;
+      display: none;
+    }
   </style>
 </head>
 <body>
   <h1>Names Manager</h1>
 
+  <!-- Error/Success Messages -->
+  <div id="errorMessage" class="error-message"></div>
+  <div id="successMessage" class="success-message"></div>
+
   <form id="addForm" autocomplete="off">
     <input id="nameInput" type="text" maxlength="50" placeholder="Enter a name" required />
-    <button type="submit">Add</button>
+    <button type="submit" id="addButton">Add</button>
+    <div id="nameInputError" class="field-error"></div>
   </form>
 
   <h2>Recorded names</h2>
