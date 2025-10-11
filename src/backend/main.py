@@ -129,6 +129,58 @@ def delete_name(name_id):
         logger.error(f"DELETE /api/names/{name_id} - Database error: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
 
+@app.route("/api/health", methods=["GET"])
+def health_check():
+    """Basic health check endpoint that returns application status."""
+    logger.info("GET /api/health - Health check requested")
+    
+    from datetime import datetime, timezone
+    
+    response = {
+        "status": "healthy",
+        "service": "Names Manager API",
+        "version": "1.0.0",
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+    
+    logger.info("GET /api/health - Application is healthy")
+    return jsonify(response), 200
+
+@app.route("/api/health/db", methods=["GET"])
+def health_check_db():
+    """Database health check endpoint that verifies database connectivity."""
+    logger.info("GET /api/health/db - Database health check requested")
+    
+    try:
+        # Attempt a simple database query to verify connectivity
+        with engine.connect() as conn:
+            # Execute a simple query that doesn't require any tables
+            result = conn.execute(select(func.now()))
+            db_time = result.scalar()
+        
+        response = {
+            "status": "healthy",
+            "service": "Names Manager API - Database",
+            "database": "connected",
+            "db_time": str(db_time),
+            "connection_url": DB_URL.split('@')[1] if '@' in DB_URL else "configured"  # Hide credentials
+        }
+        
+        logger.info("GET /api/health/db - Database connection successful")
+        return jsonify(response), 200
+        
+    except Exception as e:
+        response = {
+            "status": "unhealthy",
+            "service": "Names Manager API - Database", 
+            "database": "disconnected",
+            "error": "Database connection failed",
+            "details": str(e)
+        }
+        
+        logger.error(f"GET /api/health/db - Database connection failed: {str(e)}")
+        return jsonify(response), 503
+
 if __name__ == "__main__":
     logger.info(f"Names Manager API starting up on host={SERVER_HOST}, port={SERVER_PORT}")
     app.run(host=SERVER_HOST, port=SERVER_PORT)
