@@ -159,6 +159,41 @@ YYYY-MM-DD HH:MM:SS - main - LEVEL - MESSAGE
 2025-10-11 12:30:02 - main - WARNING - POST /api/names - Validation failed: Name cannot be empty.
 ```
 
+## Configuration
+
+The application uses environment variables for configuration, making it flexible for different deployment environments.
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DB_URL` | `postgresql+psycopg2://names_user:names_pass@db:5432/namesdb` | Database connection URL |
+| `MAX_NAME_LENGTH` | `50` | Maximum allowed length for name field |
+| `SERVER_HOST` | `0.0.0.0` | Host address to bind the server |
+| `SERVER_PORT` | `8000` | Port number for the server |
+| `LOG_LEVEL` | `INFO` | Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) |
+| `DB_ECHO` | `false` | Enable SQLAlchemy query logging (true/false) |
+
+### Configuration Files
+
+- **`.env.example`**: Template for environment configuration
+- **`docker-compose.yml`**: Container environment configuration
+- Copy `.env.example` to `.env` and modify values as needed
+
+### Examples
+
+```bash
+# Development environment
+export MAX_NAME_LENGTH=100
+export LOG_LEVEL=DEBUG
+export DB_ECHO=true
+
+# Production environment  
+export LOG_LEVEL=WARNING
+export MAX_NAME_LENGTH=50
+export DB_ECHO=false
+```
+
 ## Tasks Completed ✅
 
 1. ✅ **Task 1.1**: Set Up Basic Testing Infrastructure
@@ -184,3 +219,11 @@ YYYY-MM-DD HH:MM:SS - main - LEVEL - MESSAGE
    - Request/response logging for all API endpoints
    - Error and validation failure logging
    - Database operation logging with success/failure tracking
+
+5. ✅ **Task 1.5**: Extract Configuration to Environment Variables
+   - Externalized all hardcoded configuration values
+   - Configurable MAX_NAME_LENGTH via environment variable
+   - Configurable database, server, and logging settings
+   - Created comprehensive .env.example documentation
+   - Updated docker-compose.yml to use environment variable substitution
+   - All services (database, backend, frontend) now use .env configuration

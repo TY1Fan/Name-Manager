@@ -10,11 +10,15 @@ class MockPsycopg2:
     class extensions:
         ISOLATION_LEVEL_AUTOCOMMIT = 0
     
+    class extras:
+        pass
+    
     def connect(self, *args, **kwargs):
         pass
 
 sys.modules['psycopg2'] = MockPsycopg2()
 sys.modules['psycopg2.extensions'] = MockPsycopg2.extensions
+sys.modules['psycopg2.extras'] = MockPsycopg2.extras
 
 # Fix werkzeug version issue in Flask test client
 import werkzeug
