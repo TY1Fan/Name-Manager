@@ -3,12 +3,19 @@ import logging
 from flask import Flask, request, jsonify
 from sqlalchemy import create_engine, Table, Column, Integer, Text, TIMESTAMP, MetaData, select, func
 
+# Configuration from environment variables
 DB_URL = os.environ.get(
     "DB_URL",
     "postgresql+psycopg2://names_user:names_pass@db:5432/namesdb"
 )
 
-engine = create_engine(DB_URL, echo=False, future=True)
+MAX_NAME_LENGTH = int(os.environ.get("MAX_NAME_LENGTH", "50"))
+DB_ECHO = os.environ.get("DB_ECHO", "false").lower() == "true"
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
+SERVER_HOST = os.environ.get("SERVER_HOST", "0.0.0.0")
+SERVER_PORT = int(os.environ.get("SERVER_PORT", "8000"))
+
+engine = create_engine(DB_URL, echo=DB_ECHO, future=True)
 metadata = MetaData()
 
 table = Table(
@@ -25,7 +32,7 @@ app = Flask(__name__)
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
@@ -36,8 +43,8 @@ def validation(name: str):
     name = name.strip()
     if name == "":
         return False, "Name cannot be empty."
-    if len(name) > 50:
-        return False, "Max length is 50 characters."
+    if len(name) > MAX_NAME_LENGTH:
+        return False, f"Max length is {MAX_NAME_LENGTH} characters."
     return True, name
 
 @app.route("/api/names", methods=["POST"])
@@ -123,5 +130,5 @@ def delete_name(name_id):
         return jsonify({"error": "Internal server error"}), 500
 
 if __name__ == "__main__":
-    logger.info("Names Manager API starting up on host=0.0.0.0, port=8000")
-    app.run(host="0.0.0.0", port=8000)
+    logger.info(f"Names Manager API starting up on host={SERVER_HOST}, port={SERVER_PORT}")
+    app.run(host=SERVER_HOST, port=SERVER_PORT)
