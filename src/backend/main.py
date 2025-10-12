@@ -1,5 +1,7 @@
 import os
 import logging
+import html
+import re
 from flask import Flask, request, jsonify
 from sqlalchemy import create_engine, Table, Column, Integer, Text, TIMESTAMP, MetaData, select, func
 
@@ -39,13 +41,62 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+def sanitize_input(text: str) -> str:
+    """
+    Sanitize user input to prevent XSS attacks and other malicious content.
+    
+    Args:
+        text (str): Raw user input
+        
+    Returns:
+        str: Sanitized text safe for storage and display
+    """
+    if not text:
+        return text
+    
+    # First, escape HTML entities to prevent XSS
+    sanitized = html.escape(text)
+    
+    # Remove potentially dangerous patterns (while preserving escaped content)
+    # Remove any null bytes
+    sanitized = sanitized.replace('\x00', '')
+    
+    # Remove excessive whitespace but preserve single spaces
+    sanitized = re.sub(r'\s+', ' ', sanitized)
+    
+    # Strip leading/trailing whitespace
+    sanitized = sanitized.strip()
+    
+    return sanitized
+
 def validation(name: str):
-    name = name.strip()
-    if name == "":
+    """
+    Validate and sanitize user input for names.
+    
+    Args:
+        name (str): Raw name input from user
+        
+    Returns:
+        tuple: (is_valid: bool, result: str) where result is either sanitized name or error message
+    """
+    # Handle None input
+    if name is None:
         return False, "Name cannot be empty."
-    if len(name) > MAX_NAME_LENGTH:
+    
+    # First sanitize the input to prevent XSS
+    sanitized_name = sanitize_input(name)
+    
+    if sanitized_name == "":
+        return False, "Name cannot be empty."
+    
+    if len(sanitized_name) > MAX_NAME_LENGTH:
         return False, f"Max length is {MAX_NAME_LENGTH} characters."
-    return True, name
+    
+    # Log if sanitization changed the input (for security monitoring)
+    if name != sanitized_name:
+        logger.warning(f"Input sanitization applied: '{name}' -> '{sanitized_name}'")
+    
+    return True, sanitized_name
 
 @app.route("/api/names", methods=["POST"])
 def add_name():
@@ -128,6 +179,58 @@ def delete_name(name_id):
     except Exception as e:
         logger.error(f"DELETE /api/names/{name_id} - Database error: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
+
+@app.route("/api/health", methods=["GET"])
+def health_check():
+    """Basic health check endpoint that returns application status."""
+    logger.info("GET /api/health - Health check requested")
+    
+    from datetime import datetime, timezone
+    
+    response = {
+        "status": "healthy",
+        "service": "Names Manager API",
+        "version": "1.0.0",
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+    
+    logger.info("GET /api/health - Application is healthy")
+    return jsonify(response), 200
+
+@app.route("/api/health/db", methods=["GET"])
+def health_check_db():
+    """Database health check endpoint that verifies database connectivity."""
+    logger.info("GET /api/health/db - Database health check requested")
+    
+    try:
+        # Attempt a simple database query to verify connectivity
+        with engine.connect() as conn:
+            # Execute a simple query that doesn't require any tables
+            result = conn.execute(select(func.now()))
+            db_time = result.scalar()
+        
+        response = {
+            "status": "healthy",
+            "service": "Names Manager API - Database",
+            "database": "connected",
+            "db_time": str(db_time),
+            "connection_url": DB_URL.split('@')[1] if '@' in DB_URL else "configured"  # Hide credentials
+        }
+        
+        logger.info("GET /api/health/db - Database connection successful")
+        return jsonify(response), 200
+        
+    except Exception as e:
+        response = {
+            "status": "unhealthy",
+            "service": "Names Manager API - Database", 
+            "database": "disconnected",
+            "error": "Database connection failed",
+            "details": str(e)
+        }
+        
+        logger.error(f"GET /api/health/db - Database connection failed: {str(e)}")
+        return jsonify(response), 503
 
 if __name__ == "__main__":
     logger.info(f"Names Manager API starting up on host={SERVER_HOST}, port={SERVER_PORT}")
