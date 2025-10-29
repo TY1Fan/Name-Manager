@@ -47,6 +47,24 @@ This document provides traceability from requirements through implementation, en
 | **CONST-M1**: Basic health checks | **TARGET-M1**: Health endpoints | **PLAN-2.1**: Health Checks & Documentation | **TASK-2.1**: Add Health Check Endpoints | `/health` and `/health/db` respond | Health endpoints in `main.py` |
 | **CONST-M2**: Monitor performance | **TARGET-M2**: Reasonable response times | **PLAN-2.1**: Health Checks & Documentation | **TASK-2.3**: Create Manual Testing Checklist | Manual performance verification | Performance tests in `TESTING.md` |
 
+### Docker Swarm Orchestration Requirements (Phase 3)
+
+| Constitution Req | Target Spec | Plan Milestone | Task | Test/Verification | Implementation |
+|------------------|-------------|----------------|------|-------------------|----------------|
+| **CONST-D1**: Distributed deployment | **TARGET-D1**: Manager/Worker topology | **PLAN-3.1**: Swarm Cluster Setup | **TASK-3.1**: Create Stack Configuration | Services deploy to correct nodes | `src/swarm/stack.yaml` |
+| **CONST-D2**: Service placement | **TARGET-D2**: Placement constraints | **PLAN-3.1**: Swarm Cluster Setup | **TASK-3.1**: Create Stack Configuration | web+api on manager, db on worker | Placement constraints in stack.yaml |
+| **CONST-D3**: Persistent storage | **TARGET-D3**: Database volume at /var/lib/postgres-data | **PLAN-3.1**: Swarm Cluster Setup | **TASK-3.9**: Update Vagrantfile | Data persists across restarts | Volume mount in stack.yaml |
+| **CONST-D4**: Overlay networking | **TARGET-D4**: Service discovery | **PLAN-3.1**: Swarm Cluster Setup | **TASK-3.1**: Create Stack Configuration | Backend connects to db by name | Overlay network `appnet` |
+| **CONST-D5**: Health monitoring | **TARGET-D5**: /healthz endpoint | **PLAN-3.2**: Stack Development | **TASK-3.2**: Add /healthz Endpoint | Returns {"status":"ok"} | `/healthz` in `main.py` |
+| **CONST-D6**: Port ingress | **TARGET-D6**: Frontend on port 80 | **PLAN-3.1**: Swarm Cluster Setup | **TASK-3.1**: Create Stack Configuration | Frontend accessible on port 80 | Port 80:80 in stack.yaml |
+| **CONST-D7**: Cluster initialization | **TARGET-D7**: Automated setup | **PLAN-3.1**: Swarm Cluster Setup | **TASK-3.3**: Create init-swarm.sh | Script initializes cluster | `ops/init-swarm.sh` |
+| **CONST-D8**: Stack deployment | **TARGET-D8**: Automated deployment | **PLAN-3.2**: Stack Development | **TASK-3.4**: Create deploy.sh | Script deploys stack | `ops/deploy.sh` |
+| **CONST-D9**: Health verification | **TARGET-D9**: Automated verification | **PLAN-3.3**: Testing & Verification | **TASK-3.5**: Create verify.sh | Script validates deployment | `ops/verify.sh` |
+| **CONST-D10**: Cleanup automation | **TARGET-D10**: Automated teardown | **PLAN-3.3**: Testing & Verification | **TASK-3.6**: Create cleanup.sh | Script removes stack cleanly | `ops/cleanup.sh` |
+| **CONST-D11**: Local dev preserved | **TARGET-D11**: Compose unchanged | **PLAN-3.3**: Testing & Verification | **TASK-3.10**: Test Compose Still Works | docker-compose.yml functions | Existing compose file |
+| **CONST-D12**: Worker node infrastructure | **TARGET-D12**: Vagrant VM support | **PLAN-3.1**: Swarm Cluster Setup | **TASK-3.0**: Create Vagrant Infrastructure ✓ | VM infrastructure ready | `vagrant/Vagrantfile`<br/>`vagrant/VAGRANT_SETUP.md`<br/>`vagrant/README.md` |
+| **CONST-D13**: Persistent storage config | **TARGET-D13**: Database volume at /var/lib/postgres-data | **PLAN-3.1**: Swarm Cluster Setup | **TASK-3.9**: Update Vagrantfile | Data persists across restarts | Volume mount in stack.yaml |
+
 ## Detailed Requirement Mappings
 
 ### Phase 1: Basic Testing & Code Quality
@@ -265,6 +283,25 @@ CONST-M1 (Basic health checks)
 - [ ] **Documentation**: Tasks 2.3, 2.4 completed
 - [ ] **Manual testing**: All scenarios documented and verified
 - [ ] **Configuration**: All secrets externalized
+
+### Phase 3 Completion Checklist
+- [x] **Vagrant Infrastructure**: Task 3.0 completed, Vagrant VM configuration ready
+  - `vagrant/Vagrantfile` created with Ubuntu 22.04, 2GB RAM, 2 CPUs
+  - `vagrant/VAGRANT_SETUP.md` comprehensive setup guide (300+ lines)
+  - `vagrant/README.md` quick start guide
+  - `vagrant/backups/` directory for database backups
+- [ ] **Stack Configuration**: Task 3.1 completed, stack.yaml created
+- [ ] **Health Endpoint**: Task 3.2 completed, /healthz endpoint works
+- [ ] **Ops Scripts**: Tasks 3.3-3.6 completed, all scripts functional
+- [ ] **Cluster Setup**: Swarm initialized with 1 manager + 1 worker
+- [ ] **Service Placement**: web+api on manager, db on worker verified
+- [ ] **Persistent Storage**: Database data at /var/lib/postgres-data
+- [ ] **Port Ingress**: Frontend accessible on port 80
+- [ ] **Service Discovery**: Backend can reach db by DNS name
+- [ ] **Health Checks**: All services pass health checks
+- [ ] **Local Dev Preserved**: docker-compose.yml still works
+- [ ] **Documentation**: SWARM_QUICKSTART.md and README.md updated
+- [ ] **End-to-End Testing**: Full integration test passed
 
 ### Final Acceptance Checklist
 - [ ] **All constitutional requirements addressed**
