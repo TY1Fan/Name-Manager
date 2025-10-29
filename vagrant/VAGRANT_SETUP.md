@@ -228,19 +228,53 @@ vagrant box remove ubuntu/jammy64
 
 ### Database Volume Persistence
 
-The database volume will be stored inside the VM at:
+The database service in Docker Swarm uses a bind mount to a dedicated directory on the worker VM:
+
+**Primary Storage Location:**
 ```
-/var/lib/docker/volumes/
+/var/lib/postgres-data
 ```
 
-**Data Persistence:**
-- ✅ Survives `vagrant halt` and `vagrant up`
-- ✅ Survives `vagrant reload`
-- ❌ Lost on `vagrant destroy`
+This directory is:
+- Created automatically by the Vagrantfile provisioning
+- Owned by the VM's filesystem (not synced to host)
+- Optimized for database performance
+- Has proper permissions (755)
+
+**Data Persistence Behavior:**
+- ✅ **Persists across `vagrant halt` and `vagrant up`** - Data is preserved
+- ✅ **Persists across `vagrant reload`** - Data is preserved
+- ✅ **Persists across VM restarts** - Data is preserved
+- ✅ **Persists across Swarm stack redeployments** - Data is preserved
+- ❌ **Lost on `vagrant destroy`** - Complete VM removal deletes all data
+
+**Why Not Use Synced Folders for Database Data?**
+
+The PostgreSQL data directory is intentionally NOT synced to the host because:
+1. **Performance**: Native VM filesystem is much faster than synced folders
+2. **Reliability**: Avoids file locking issues with database files
+3. **Compatibility**: PostgreSQL requires specific filesystem features
+4. **Best Practice**: Database volumes should use native storage
+
+### Checking Storage Status
+
+```bash
+# Check if persistent storage exists and its size
+cd /Users/tohyifan/HW_3/vagrant
+vagrant ssh -c "ls -lah /var/lib/postgres-data"
+
+# Check storage usage
+vagrant ssh -c "du -sh /var/lib/postgres-data"
+
+# When database is running, you'll see PostgreSQL files
+vagrant ssh -c "ls /var/lib/postgres-data"
+# Expected output (after deployment):
+# base  global  pg_wal  postgresql.conf  postmaster.opts  ...
+```
 
 ### Backing Up Data
 
-The Vagrantfile includes a synced folder for backups:
+The Vagrantfile includes a synced folder specifically for database backups:
 
 ```bash
 # On your Mac, backups folder is synced to VM
@@ -249,13 +283,103 @@ ls /Users/tohyifan/HW_3/vagrant/backups
 # Inside VM (vagrant ssh), access same folder
 ls /vagrant/backups
 
-# Manual backup example:
+# Create a manual backup using pg_dump
+# Method 1: From host (Mac)
+cd /Users/tohyifan/HW_3/vagrant
+vagrant ssh -c "docker exec \$(docker ps -q -f name=names-app_db) \
+  pg_dump -U postgres names_db > /vagrant/backups/backup-\$(date +%Y%m%d-%H%M%S).sql"
+
+# Method 2: From inside VM
 vagrant ssh
-docker exec names-app_db pg_dump -U names_user namesdb > /vagrant/backups/backup.sql
+docker exec $(docker ps -q -f name=names-app_db) \
+  pg_dump -U postgres names_db > /vagrant/backups/backup.sql
 exit
+
+# Backup is now available on your Mac
+ls vagrant/backups/
+```
+
+**Restore from Backup:**
+
+```bash
+# If you need to restore data after 'vagrant destroy' and rebuild:
+
+# 1. Rebuild VM and initialize Swarm
+./ops/init-swarm.sh
+./ops/deploy.sh
+
+# 2. Wait for database to be ready
+sleep 30
+
+# 3. Restore from backup
+cd vagrant
+vagrant ssh -c "docker exec -i \$(docker ps -q -f name=names-app_db) \
+  psql -U postgres names_db < /vagrant/backups/backup.sql"
+```
+
+### Testing Data Persistence
+
+**Test 1: Persist Across `vagrant reload`**
+
+```bash
+# 1. Add some data
+curl -X POST http://localhost/api/names \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Persistence Test 1"}'
+
+# 2. Count names
+BEFORE=$(curl -s http://localhost/api/names | jq '. | length')
+echo "Names before reload: $BEFORE"
+
+# 3. Reload VM
+cd vagrant
+vagrant reload
+cd ..
+
+# 4. Wait for services to restart
+./ops/deploy.sh
+sleep 30
+
+# 5. Verify data persists
+AFTER=$(curl -s http://localhost/api/names | jq '. | length')
+echo "Names after reload: $AFTER"
+
+# Should be equal
+[ "$BEFORE" -eq "$AFTER" ] && echo "✅ Data persisted!" || echo "❌ Data lost!"
+```
+
+**Test 2: Persist Across `vagrant halt/up`**
+
+```bash
+# 1. Add data
+curl -X POST http://localhost/api/names \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Halt Test 1"}'
+
+# 2. Count names
+BEFORE=$(curl -s http://localhost/api/names | jq '. | length')
+
+# 3. Halt VM
+cd vagrant
+vagrant halt
+
+# 4. Start VM again
+vagrant up
+cd ..
+
+# 5. Redeploy stack
+./ops/deploy.sh
+sleep 30
+
+# 6. Verify data persists
+AFTER=$(curl -s http://localhost/api/names | jq '. | length')
+
+[ "$BEFORE" -eq "$AFTER" ] && echo "✅ Data persisted!" || echo "❌ Data lost!"
 ```
 
 ### Before `vagrant destroy`
+
+⚠️ **WARNING**: `vagrant destroy` permanently deletes the VM and all data in `/var/lib/postgres-data`!
 
 If you need to destroy and rebuild the VM:
 
@@ -407,6 +531,177 @@ vagrant reload
 - ✅ Better for production
 - ❌ Higher network latency
 - ❌ Requires separate hardware
+
+## Persistent Storage Configuration Summary
+
+### Storage Architecture
+
+The Vagrant configuration implements a two-tier storage strategy:
+
+**1. Database Data Storage** (Performance-Critical)
+- **Location**: `/var/lib/postgres-data` on VM
+- **Type**: VM local filesystem (NOT synced)
+- **Purpose**: PostgreSQL data files
+- **Persistence**: Survives VM restarts, lost on `vagrant destroy`
+- **Performance**: Optimized for database I/O operations
+
+**2. Backup Storage** (Convenience)
+- **Location**: `./backups` (synced to `/vagrant/backups` on VM)
+- **Type**: Synced folder
+- **Purpose**: Database backups, exports
+- **Persistence**: Survives everything (stored on host)
+- **Performance**: Slower, but suitable for backups
+
+### Configuration Details
+
+The Vagrantfile automatically:
+1. Creates `/var/lib/postgres-data` directory during provisioning
+2. Sets appropriate permissions (755)
+3. Displays storage status on each VM boot
+4. Provides synced folder for backups at `./backups`
+
+**Docker Stack Configuration** (`stack.yaml`):
+```yaml
+services:
+  db:
+    volumes:
+      - type: bind
+        source: /var/lib/postgres-data
+        target: /var/lib/postgresql/data
+```
+
+This bind mount ensures database files are stored on the VM's filesystem at the dedicated path.
+
+### Data Lifecycle
+
+| Operation | Data Persists? | Notes |
+|-----------|----------------|-------|
+| `vagrant halt` | ✅ YES | VM stopped, disk preserved |
+| `vagrant up` | ✅ YES | VM restarted, data intact |
+| `vagrant reload` | ✅ YES | VM rebooted, data intact |
+| `vagrant suspend/resume` | ✅ YES | VM hibernated, data intact |
+| `vagrant provision` | ✅ YES | Only re-runs scripts, data intact |
+| `vagrant destroy` | ❌ NO | Complete removal, data deleted |
+| Stack remove/redeploy | ✅ YES | Volume persists between deployments |
+| Swarm leave/rejoin | ✅ YES | Data independent of Swarm state |
+
+### Best Practices
+
+**DO:**
+- ✅ Use `vagrant halt` for temporary stops
+- ✅ Use `vagrant reload` to apply Vagrantfile changes
+- ✅ Back up data before `vagrant destroy`
+- ✅ Test restore procedures regularly
+- ✅ Monitor storage usage with `du -sh /var/lib/postgres-data`
+
+**DON'T:**
+- ❌ Don't use synced folders for database data (performance issues)
+- ❌ Don't run `vagrant destroy` without backups
+- ❌ Don't manually modify files in `/var/lib/postgres-data`
+- ❌ Don't rely on VM snapshots alone (use pg_dump backups)
+
+### Backup Strategy
+
+**Automated Backup Example:**
+
+Create a backup script at `vagrant/backup.sh`:
+
+```bash
+#!/bin/bash
+# Automated database backup script
+
+BACKUP_DIR="/Users/tohyifan/HW_3/vagrant/backups"
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+BACKUP_FILE="backup-${TIMESTAMP}.sql"
+
+echo "Creating backup: $BACKUP_FILE"
+
+cd /Users/tohyifan/HW_3/vagrant
+vagrant ssh -c "docker exec \$(docker ps -q -f name=names-app_db) \
+  pg_dump -U postgres names_db" > "$BACKUP_DIR/$BACKUP_FILE"
+
+if [ $? -eq 0 ]; then
+    echo "✅ Backup successful: $BACKUP_FILE"
+    # Keep only last 7 backups
+    ls -t "$BACKUP_DIR"/backup-*.sql | tail -n +8 | xargs -r rm
+else
+    echo "❌ Backup failed!"
+    exit 1
+fi
+```
+
+**Schedule with cron** (macOS):
+
+```bash
+# Add to crontab (crontab -e)
+0 2 * * * /Users/tohyifan/HW_3/vagrant/backup.sh >> /Users/tohyifan/HW_3/vagrant/backups/backup.log 2>&1
+```
+
+### Troubleshooting Storage Issues
+
+**Issue: Permission Denied on `/var/lib/postgres-data`**
+
+```bash
+vagrant ssh
+sudo chmod 755 /var/lib/postgres-data
+sudo chown -R 999:999 /var/lib/postgres-data  # PostgreSQL user
+exit
+```
+
+**Issue: Disk Space Full**
+
+```bash
+# Check available space
+vagrant ssh -c "df -h"
+
+# Check database size
+vagrant ssh -c "du -sh /var/lib/postgres-data"
+
+# Clean up old logs if needed
+vagrant ssh
+sudo docker system prune -a
+exit
+```
+
+**Issue: Data Lost After `vagrant destroy`**
+
+```bash
+# Restore from backup
+vagrant up
+./ops/init-swarm.sh
+./ops/deploy.sh
+sleep 30
+
+# Restore data
+cd vagrant
+vagrant ssh -c "docker exec -i \$(docker ps -q -f name=names-app_db) \
+  psql -U postgres names_db < /vagrant/backups/backup.sql"
+```
+
+### Verification Checklist
+
+After setting up or modifying storage configuration:
+
+- [ ] `/var/lib/postgres-data` exists on worker VM
+- [ ] Directory has proper permissions (755)
+- [ ] Synced backup folder works (`./backups` ↔ `/vagrant/backups`)
+- [ ] Database writes to correct location
+- [ ] Data persists across `vagrant reload`
+- [ ] Data persists across `vagrant halt/up`
+- [ ] Backup script works
+- [ ] Restore procedure tested
+
+### Testing Persistence
+
+Use the provided test procedures in `specs/001-swarm-orchestration/TESTING.md` to verify:
+
+```bash
+# Run persistence tests
+./ops/test-e2e.sh
+
+# Or manually test
+# See "Testing Data Persistence" section above
+```
 
 ## Next Steps
 

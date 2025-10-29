@@ -33,8 +33,13 @@ Vagrant.configure("2") do |config|
   end
 
   # Synced folder for database backups (optional)
-  # Creates a shared folder between host and VM
+  # Creates a shared folder between host and VM for backup files
   config.vm.synced_folder "./backups", "/vagrant/backups", create: true
+  
+  # Note: PostgreSQL data directory (/var/lib/postgres-data) is NOT synced
+  # It uses the VM's local filesystem for better performance and reliability
+  # The directory persists within the VM across restarts (vagrant reload, halt/up)
+  # Only 'vagrant destroy' removes the data
 
   # Provisioning: Install Docker and prepare for Swarm
   config.vm.provision "shell", inline: <<-SHELL
@@ -95,6 +100,13 @@ Vagrant.configure("2") do |config|
     # Create directory for Docker volumes
     mkdir -p /var/lib/docker/volumes
     
+    # Create directory for PostgreSQL persistent data
+    # This directory will persist across VM restarts (vagrant reload, halt/up)
+    # Only 'vagrant destroy' will remove it
+    echo "Creating PostgreSQL data directory..."
+    mkdir -p /var/lib/postgres-data
+    chmod 755 /var/lib/postgres-data
+    
     echo "======================================"
     echo "✅ Docker installation complete!"
     echo "======================================"
@@ -103,10 +115,17 @@ Vagrant.configure("2") do |config|
     echo "  Hostname: swarm-worker"
     echo "  IP Address: 192.168.56.10"
     echo "  Docker Version: $(docker --version)"
+    echo "  Persistent Storage: /var/lib/postgres-data (created)"
+    echo "  Backup Folder: /vagrant/backups (synced with host)"
     echo ""
     echo "Next Steps:"
+    echo "  1. Use the automated init script (recommended):"
+    echo "     cd /Users/tohyifan/HW_3"
+    echo "     ./ops/init-swarm.sh"
+    echo ""
+    echo "  OR manually initialize Swarm:"
     echo "  1. On your Mac (manager node), initialize Swarm:"
-    echo "     docker swarm init --advertise-addr <your-mac-ip>"
+    echo "     docker swarm init --advertise-addr 192.168.56.1"
     echo ""
     echo "  2. Copy the 'docker swarm join' command from output"
     echo ""
@@ -128,6 +147,14 @@ Vagrant.configure("2") do |config|
     echo "======================================"
     echo "VM IP: 192.168.56.10"
     echo "SSH: vagrant ssh"
+    echo ""
+    # Check if postgres-data directory exists and show its size
+    if [ -d "/var/lib/postgres-data" ]; then
+      PGDATA_SIZE=$(du -sh /var/lib/postgres-data 2>/dev/null | cut -f1 || echo "0")
+      echo "Persistent Storage: /var/lib/postgres-data ($PGDATA_SIZE)"
+    else
+      echo "Persistent Storage: /var/lib/postgres-data (not yet created)"
+    fi
     echo "======================================"
   SHELL
 end
