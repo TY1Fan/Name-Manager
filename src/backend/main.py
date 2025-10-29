@@ -232,6 +232,41 @@ def health_check_db():
         logger.error(f"GET /api/health/db - Database connection failed: {str(e)}")
         return jsonify(response), 503
 
+@app.route("/healthz", methods=["GET"])
+def healthz():
+    """
+    Kubernetes-style health check endpoint for Docker Swarm.
+    
+    This endpoint is used by Docker Swarm health checks to determine if the service
+    is healthy and ready to receive traffic. It performs a lightweight database
+    connectivity check.
+    
+    Returns:
+        200 with {"status": "ok"} if the service is healthy and database is reachable
+        503 with {"status": "unhealthy", "reason": "..."} if the service cannot connect to database
+    """
+    # Use DEBUG level to avoid cluttering logs with frequent health check calls
+    logger.debug("GET /healthz - Health check requested")
+    
+    try:
+        # Perform a lightweight database connectivity check
+        # Use a simple SELECT 1 query that doesn't require any tables
+        with engine.connect() as conn:
+            conn.execute(select(1))
+        
+        logger.debug("GET /healthz - Service is healthy")
+        return jsonify({"status": "ok"}), 200
+        
+    except Exception as e:
+        # Log the error but don't expose internal details in the response
+        logger.error(f"GET /healthz - Health check failed: {str(e)}")
+        
+        # Return a simple error message without exposing internal details
+        return jsonify({
+            "status": "unhealthy",
+            "reason": "Database connection failed"
+        }), 503
+
 if __name__ == "__main__":
     logger.info(f"Names Manager API starting up on host={SERVER_HOST}, port={SERVER_PORT}")
     app.run(host=SERVER_HOST, port=SERVER_PORT)
