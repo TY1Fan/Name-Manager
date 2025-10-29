@@ -1,0 +1,147 @@
+# Docker Swarm Stack Configuration for Names Manager
+# Multi-node deployment: Manager (web+api) + Worker (db)
+#
+# Usage:
+#   docker stack deploy -c swarm/stack.yaml names-app
+#
+# Prerequisites:
+#   - Docker Swarm initialized with 1 manager + 1 worker node
+#   - .env file configured in src/ directory
+#   - Worker node has /var/lib/postgres-data directory created
+#
+# Architecture:
+#   Manager Node (Laptop): frontend, backend
+#   Worker Node (VM/Lab): db
+#   Network: overlay network 'appnet' for service discovery
+
+version: "3.8"
+
+services:
+  # Database Service - Runs on Worker Node
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      # Persistent storage on worker node
+      - db_data:/var/lib/postgresql/data
+      # Init script - must be available on worker node
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - appnet
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      placement:
+        constraints:
+          - node.role == worker
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+      rollback_config:
+        parallelism: 1
+        delay: 10s
+
+  # Backend Service - Runs on Manager Node
+  backend:
+    image: names-manager-backend:latest
+    environment:
+      # Database configuration
+      DB_URL: ${DB_URL}
+      
+      # Application configuration
+      MAX_NAME_LENGTH: ${MAX_NAME_LENGTH}
+      SERVER_HOST: ${SERVER_HOST}
+      SERVER_PORT: ${SERVER_PORT}
+      
+      # Logging configuration
+      LOG_LEVEL: ${LOG_LEVEL}
+      DB_ECHO: ${DB_ECHO}
+    networks:
+      - appnet
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+      rollback_config:
+        parallelism: 1
+        delay: 10s
+    depends_on:
+      - db
+
+  # Frontend Service - Runs on Manager Node
+  frontend:
+    image: names-manager-frontend:latest
+    ports:
+      # Published on port 80 for external access
+      - target: 80
+        published: 80
+        protocol: tcp
+        mode: ingress
+    networks:
+      - appnet
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+      rollback_config:
+        parallelism: 1
+        delay: 10s
+    depends_on:
+      - backend
+
+# Network Configuration
+networks:
+  appnet:
+    driver: overlay
+    attachable: true
+    driver_opts:
+      encrypted: "true"
+
+# Volume Configuration
+volumes:
+  db_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: /var/lib/postgres-data
+      o: bind
