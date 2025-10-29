@@ -1,0 +1,83 @@
+# Backup Directory
+
+This directory is synced between your Mac and the Vagrant VM.
+
+## Purpose
+
+Store PostgreSQL database backups here before destroying the VM or as part of regular backup procedures.
+
+## Access
+
+**From Mac:**
+```bash
+ls /Users/tohyifan/HW_3/vagrant/backups/
+```
+
+**From Vagrant VM:**
+```bash
+vagrant ssh
+ls /vagrant/backups/
+```
+
+## Creating Backups
+
+### Manual Backup
+
+```bash
+# SSH into VM
+vagrant ssh
+
+# Create backup
+docker exec names-app_db pg_dump -U names_user namesdb > /vagrant/backups/backup-$(date +%Y%m%d-%H%M%S).sql
+
+# Verify backup
+ls -lh /vagrant/backups/
+
+# Exit VM
+exit
+
+# Backup is now on your Mac too
+ls -lh vagrant/backups/
+```
+
+### Before Destroying VM
+
+```bash
+# Always backup first!
+vagrant ssh
+docker exec names-app_db pg_dump -U names_user namesdb > /vagrant/backups/pre-destroy-backup.sql
+exit
+
+# Now safe to destroy
+vagrant destroy
+```
+
+## Restoring Backups
+
+```bash
+# After recreating VM and redeploying stack
+vagrant ssh
+
+# Copy backup into database container
+docker cp /vagrant/backups/backup.sql names-app_db:/tmp/
+
+# Restore
+docker exec names-app_db psql -U names_user -d namesdb -f /tmp/backup.sql
+
+exit
+```
+
+## Backup Retention
+
+- This directory is NOT versioned (in .gitignore)
+- Backup files are stored only locally
+- For production, implement proper backup strategy
+- Consider cloud storage for important backups
+
+## File Naming Convention
+
+Recommended format:
+- `backup-YYYYMMDD-HHMMSS.sql` - Timestamped backups
+- `pre-destroy-backup.sql` - Before VM destruction
+- `migration-backup.sql` - Before major changes
+- `daily-backup.sql` - Regular automated backups

@@ -1,0 +1,133 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# Vagrantfile for Docker Swarm Worker Node
+# This VM will run the database service for the Names Manager application
+
+Vagrant.configure("2") do |config|
+  # Use Ubuntu 22.04 LTS (Jammy) - lightweight and Docker-compatible
+  config.vm.box = "ubuntu/jammy64"
+  config.vm.box_version = ">= 20230919.0.0"
+
+  # Hostname for the worker node
+  config.vm.hostname = "swarm-worker"
+
+  # Network Configuration
+  # Private network allows host-VM communication
+  # IP address: 192.168.56.10 (adjust if conflicts with your network)
+  config.vm.network "private_network", ip: "192.168.56.10"
+
+  # Port forwarding (optional, mainly for debugging)
+  # PostgreSQL port - for direct access if needed
+  config.vm.network "forwarded_port", guest: 5432, host: 5433, auto_correct: true
+
+  # VM Resources
+  config.vm.provider "virtualbox" do |vb|
+    vb.name = "swarm-worker"
+    vb.memory = "2048"  # 2GB RAM for database
+    vb.cpus = 2         # 2 CPU cores
+    
+    # Enable DNS proxy to resolve host names
+    vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+    vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
+  end
+
+  # Synced folder for database backups (optional)
+  # Creates a shared folder between host and VM
+  config.vm.synced_folder "./backups", "/vagrant/backups", create: true
+
+  # Provisioning: Install Docker and prepare for Swarm
+  config.vm.provision "shell", inline: <<-SHELL
+    set -e
+    
+    echo "======================================"
+    echo "Setting up Docker Swarm Worker Node"
+    echo "======================================"
+    
+    # Update package list
+    echo "[1/6] Updating package lists..."
+    apt-get update -qq
+    
+    # Install prerequisites
+    echo "[2/6] Installing prerequisites..."
+    apt-get install -y -qq \
+      apt-transport-https \
+      ca-certificates \
+      curl \
+      gnupg \
+      lsb-release
+    
+    # Add Docker's official GPG key
+    echo "[3/6] Adding Docker GPG key..."
+    mkdir -p /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+      gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    
+    # Set up Docker repository
+    echo "[4/6] Setting up Docker repository..."
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+      https://download.docker.com/linux/ubuntu \
+      $(lsb_release -cs) stable" | \
+      tee /etc/apt/sources.list.d/docker.list > /dev/null
+    
+    # Install Docker Engine
+    echo "[5/6] Installing Docker Engine..."
+    apt-get update -qq
+    apt-get install -y -qq \
+      docker-ce \
+      docker-ce-cli \
+      containerd.io \
+      docker-buildx-plugin \
+      docker-compose-plugin
+    
+    # Add vagrant user to docker group
+    usermod -aG docker vagrant
+    
+    # Enable and start Docker service
+    systemctl enable docker
+    systemctl start docker
+    
+    # Verify Docker installation
+    echo "[6/6] Verifying Docker installation..."
+    docker --version
+    
+    # Create directory for Docker volumes
+    mkdir -p /var/lib/docker/volumes
+    
+    echo "======================================"
+    echo "✅ Docker installation complete!"
+    echo "======================================"
+    echo ""
+    echo "Worker Node Information:"
+    echo "  Hostname: swarm-worker"
+    echo "  IP Address: 192.168.56.10"
+    echo "  Docker Version: $(docker --version)"
+    echo ""
+    echo "Next Steps:"
+    echo "  1. On your Mac (manager node), initialize Swarm:"
+    echo "     docker swarm init --advertise-addr <your-mac-ip>"
+    echo ""
+    echo "  2. Copy the 'docker swarm join' command from output"
+    echo ""
+    echo "  3. SSH into this VM and run the join command:"
+    echo "     vagrant ssh"
+    echo "     sudo <paste-join-command-here>"
+    echo ""
+    echo "  4. Verify on manager node:"
+    echo "     docker node ls"
+    echo "======================================"
+  SHELL
+
+  # Optional: Provision script to save Swarm join token
+  # This creates a shared file for the join command
+  config.vm.provision "shell", run: "always", inline: <<-SHELL
+    # Display VM network information on each boot
+    echo "======================================"
+    echo "Swarm Worker Node Ready"
+    echo "======================================"
+    echo "VM IP: 192.168.56.10"
+    echo "SSH: vagrant ssh"
+    echo "======================================"
+  SHELL
+end

@@ -1,0 +1,20 @@
+# Vagrant
+.vagrant/
+*.log
+
+# VirtualBox
+*.vdi
+*.vmdk
+
+# Backup files
+backups/*.sql
+backups/*.dump
+!backups/.gitkeep
+
+# SSH keys (if generated)
+*.pem
+*.key
+
+# OS files
+.DS_Store
+Thumbs.db
