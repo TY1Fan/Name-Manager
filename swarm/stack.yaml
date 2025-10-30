@@ -31,11 +31,11 @@ services:
     image: localhost/names-backend:latest
     environment:
       DATABASE_URL: postgresql+psycopg2://names_user:names_pass@db:5432/namesdb
-      MAX_NAME_LENGTH: 50
+      MAX_NAME_LENGTH: "50"
       SERVER_HOST: 0.0.0.0
-      SERVER_PORT: 8000
+      SERVER_PORT: "8000"
       LOG_LEVEL: INFO
-      DB_ECHO: false
+      DB_ECHO: "false"
     networks:
       - appnet
     deploy:
