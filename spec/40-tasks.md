@@ -427,11 +427,11 @@ docker --version
 6. Verify Docker on both VMs
 
 **Acceptance Criteria**:
-- [ ] Both VMs start successfully
-- [ ] Docker installed on manager VM
-- [ ] Docker installed on worker VM
-- [ ] Can SSH to both VMs
-- [ ] `docker --version` works on both
+- [x] Both VMs start successfully (✅ both running)
+- [x] Docker installed on manager VM (✅ Docker 28.5.1)
+- [x] Docker installed on worker VM (✅ Docker 28.5.1)
+- [x] Can SSH to both VMs (✅ vagrant ssh works)
+- [x] `docker --version` works on both (✅ verified)
 
 **Testing**:
 ```bash
