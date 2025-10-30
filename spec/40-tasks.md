@@ -597,8 +597,8 @@ docker network ls | grep appnet
 - `swarm/` directory
 
 **Acceptance Criteria**:
-- [ ] `swarm/` directory exists at project root
-- [ ] Directory structure documented
+- [x] `swarm/` directory exists at project root (✅ created)
+- [x] Directory structure documented (✅ swarm/README.md created)
 
 ---
 
