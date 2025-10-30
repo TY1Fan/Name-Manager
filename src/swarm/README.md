@@ -124,11 +124,12 @@ docker stack rm names-app
 ## Service Configuration
 
 ### Database (db)
-- **Node**: Worker only (`node.role == worker`)
+- **Node**: Worker with label `role=db` (`node.labels.role == db`)
 - **Port**: Internal only (5432)
 - **Volume**: `/var/lib/postgres-data` on worker node
 - **Health Check**: `pg_isready` every 10s
 - **Replicas**: 1 (stateful service)
+- **Note**: Worker node is automatically labeled during `init-swarm.sh`
 
 ### Backend (backend)
 - **Node**: Manager only (`node.role == manager`)

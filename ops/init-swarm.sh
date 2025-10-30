@@ -333,6 +333,24 @@ join_worker_to_swarm() {
         cd "$VAGRANT_DIR"
         if vagrant ssh -c "${join_command}" &> /dev/null; then
             print_success "Worker node joined successfully"
+            
+            # Label the worker node for database placement
+            cd - > /dev/null
+            print_info "Labeling worker node for database placement..."
+            
+            # Get the worker node ID
+            local worker_node_id
+            worker_node_id=$(docker node ls --filter "role=worker" --format "{{.ID}}" | head -n 1)
+            
+            if [ -n "$worker_node_id" ]; then
+                if docker node update --label-add role=db "$worker_node_id" &> /dev/null; then
+                    print_success "Worker node labeled with role=db"
+                else
+                    print_warning "Failed to label worker node (may already be labeled)"
+                fi
+            else
+                print_warning "Could not find worker node ID for labeling"
+            fi
         else
             print_error "Failed to join worker node"
             echo "Troubleshooting steps:"
@@ -342,11 +360,13 @@ join_worker_to_swarm() {
             cd - > /dev/null
             exit 1
         fi
-        cd - > /dev/null
     else
         print_warning "Skipping worker join (--skip-vagrant flag)"
         echo "To join manually from worker node, run:"
         echo "  ${join_command}"
+        echo ""
+        echo "Then label the worker node with:"
+        echo "  docker node update --label-add role=db <worker-node-id>"
     fi
     
     echo ""
