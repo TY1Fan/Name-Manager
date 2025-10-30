@@ -1109,11 +1109,11 @@ docker service ps names-app_db --format "table {{.Name}}\t{{.CurrentState}}"
 7. Document persistence behavior
 
 **Acceptance Criteria**:
-- [ ] Data added through API visible after restart
-- [ ] Files exist in `/var/lib/postgres-data` on worker
-- [ ] Data survives `docker service update --force`
-- [ ] Data survives service scale down/up
-- [ ] Data survives stack removal/redeployment
+- [x] Data added through API visible after restart
+- [x] Files exist in `/var/lib/postgres-data` on worker
+- [x] Data survives `docker service update --force`
+- [x] Data survives service scale down/up
+- [x] Data survives stack removal/redeployment
 
 **Commands**:
 ```bash
