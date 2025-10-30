@@ -1221,11 +1221,11 @@ curl http://localhost:8080/api/names | grep "Persistence Test"
 - `src/docker-compose.yml` or `src/compose.yaml`
 
 **Acceptance Criteria**:
-- [ ] Compose file exists for single-host local development
-- [ ] Contains all bug fixes (DATABASE_URL support, etc.)
-- [ ] Works with `docker-compose up` or `docker compose up`
-- [ ] Documented as development workflow
-- [ ] Separate from production stack.yaml
+- [x] Compose file exists for single-host local development
+- [x] Contains all bug fixes (DATABASE_URL support, etc.)
+- [x] Works with `docker-compose up` or `docker compose up`
+- [x] Documented as development workflow
+- [x] Separate from production stack.yaml
 
 **Testing**:
 ```bash
