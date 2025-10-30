@@ -564,10 +564,10 @@ docker node inspect swarm-worker --format '{{.Spec.Labels}}'
 4. Inspect network: `docker network inspect appnet`
 
 **Acceptance Criteria**:
-- [ ] Network `appnet` created
-- [ ] Driver is `overlay`
-- [ ] Network is attachable
-- [ ] Network spans both nodes
+- [x] Network `appnet` created (✅ ID: vw5v7ddfaytt3s6oq8kbye6p0)
+- [x] Driver is `overlay` (✅ verified)
+- [x] Network is attachable (✅ Attachable: true)
+- [x] Network spans both nodes (✅ Scope: swarm, Subnet: 10.0.1.0/24)
 
 **Commands**:
 ```bash
