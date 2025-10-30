@@ -124,11 +124,15 @@ async function loadNames() {
     namesList.innerHTML = "";
 
     if (data.names && data.names.length > 0) {
-      data.names.forEach((name) => {
+      data.names.forEach((item) => {
         const li = document.createElement("li");
+        const timestamp = item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A';
         li.innerHTML = `
-          <span>${escapeHtml(name)}</span>
-          <button onclick="deleteName('${escapeHtml(name)}')" class="delete-btn">Delete</button>
+          <div class="name-content">
+            <span class="name">${escapeHtml(item.name)}</span>
+            <span class="meta">${timestamp}</span>
+          </div>
+          <button onclick="deleteName(${item.id})" class="delete-btn">Delete</button>
         `;
         namesList.appendChild(li);
       });
@@ -197,25 +201,29 @@ addForm.addEventListener("submit", async (e) => {
   }
 });
 
-async function deleteName(nameToDelete) {
+async function deleteName(nameId) {
   try {
     hideMessages();
     
+    // Get the name text from the DOM for the confirmation dialog
+    const nameElement = event.target.closest('li').querySelector('.name');
+    const nameText = nameElement ? nameElement.textContent : 'this name';
+    
     // Show confirmation with better styling than default confirm()
-    if (!confirm(`Are you sure you want to delete "${nameToDelete}"?`)) {
+    if (!confirm(`Are you sure you want to delete "${nameText}"?`)) {
       return;
     }
     
-    const res = await apiRequest(`/names/${encodeURIComponent(nameToDelete)}`, { 
+    const res = await apiRequest(`/names/${nameId}`, { 
       method: "DELETE" 
     });
     
-    showSuccess(`Successfully deleted "${nameToDelete}"`);
+    showSuccess(`Successfully deleted "${nameText}"`);
     await loadNames();
     
   } catch (error) {
     if (error.message.includes('not found')) {
-      showError(`Name "${nameToDelete}" was not found`);
+      showError(`Name with ID ${nameId} was not found`);
     } else {
       showError(`Failed to delete name: ${error.message}`);
     }
