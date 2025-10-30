@@ -459,10 +459,10 @@ vagrant ssh worker -c "ping -c 3 192.168.56.10"
 4. Verify Swarm status: `docker node ls`
 
 **Acceptance Criteria**:
-- [ ] Swarm initialized successfully
-- [ ] Manager node shows as Leader
-- [ ] Join token saved securely
-- [ ] `docker node ls` shows 1 node (manager)
+- [x] Swarm initialized successfully (✅ Swarm active)
+- [x] Manager node shows as Leader (✅ MANAGER STATUS: Leader)
+- [x] Join token saved securely (✅ saved in vagrant/swarm-join-tokens.md)
+- [x] `docker node ls` shows 1 node (✅ swarm-manager Ready/Active)
 
 **Commands**:
 ```bash
