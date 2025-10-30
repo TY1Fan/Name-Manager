@@ -1705,11 +1705,11 @@ echo "To redeploy: ops/deploy.sh"
 ```
 
 **Acceptance Criteria**:
-- [ ] Script removes stack safely
-- [ ] Script preserves persistent data
-- [ ] Script provides cleanup instructions
-- [ ] Script requires confirmation
-- [ ] Script shows remaining resources
+- [x] Script removes stack safely
+- [x] Script preserves persistent data
+- [x] Script provides cleanup instructions
+- [x] Script requires confirmation
+- [x] Script shows remaining resources
 
 ---
 
