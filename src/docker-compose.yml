@@ -26,6 +26,8 @@ services:
         condition: service_healthy
     environment:
       # Database configuration
+      # Support both DATABASE_URL (standard) and DB_URL (legacy)
+      DATABASE_URL: ${DATABASE_URL:-}
       DB_URL: ${DB_URL}
       
       # Application configuration
