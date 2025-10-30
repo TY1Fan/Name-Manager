@@ -25,10 +25,28 @@ set -e  # Exit on error
 set -o pipefail  # Exit on pipe failure
 
 # Configuration
-MANAGER_IP="192.168.56.1"
 WORKER_IP="192.168.56.10"
 VAGRANT_DIR="vagrant"
 SWARM_PORT="2377"
+
+# Detect manager IP based on OS
+# On macOS with Docker Desktop, we need to use the main network interface (en0)
+# because Docker Desktop doesn't expose Swarm ports on VirtualBox host-only network
+if [[ "$(uname)" == "Darwin" ]]; then
+    # macOS - use main network interface IP
+    MANAGER_IP=$(ifconfig en0 2>/dev/null | grep "inet " | grep -v inet6 | awk '{print $2}')
+    if [[ -z "$MANAGER_IP" ]]; then
+        # Try other interfaces if en0 fails
+        MANAGER_IP=$(ifconfig | grep "inet " | grep -v "127.0.0.1" | grep -v "192.168.56.1" | head -1 | awk '{print $2}')
+    fi
+    if [[ -z "$MANAGER_IP" ]]; then
+        echo "Error: Could not detect network IP. Please check your network connection."
+        exit 1
+    fi
+else
+    # Linux - use VirtualBox host-only network
+    MANAGER_IP="192.168.56.1"
+fi
 
 # Colors for output
 RED='\033[0;31m'
@@ -197,7 +215,8 @@ start_vagrant_vm() {
     # Check VM status
     cd "$VAGRANT_DIR"
     local vm_status
-    vm_status=$(vagrant status 2>/dev/null | grep "swarm-worker" | awk '{print $2}')
+    # Look for "default" machine name (Vagrant's default for single-VM setups)
+    vm_status=$(vagrant status 2>/dev/null | grep "default" | awk '{print $2}')
     
     case "$vm_status" in
         running)
@@ -453,6 +472,15 @@ verify_cluster() {
 
 main() {
     print_header "Docker Swarm Cluster Initialization"
+    echo ""
+    
+    # Show detected configuration
+    echo "Configuration:"
+    echo "  Manager IP: ${MANAGER_IP}"
+    echo "  Worker IP:  ${WORKER_IP}"
+    if [[ "$(uname)" == "Darwin" ]]; then
+        print_info "Detected macOS - using main network interface IP for Swarm"
+    fi
     echo ""
     
     # Parse arguments

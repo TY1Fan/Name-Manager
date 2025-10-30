@@ -5,9 +5,8 @@
 # This VM will run the database service for the Names Manager application
 
 Vagrant.configure("2") do |config|
-  # Use Ubuntu 22.04 LTS (Jammy) - lightweight and Docker-compatible
-  config.vm.box = "ubuntu/jammy64"
-  config.vm.box_version = ">= 20230919.0.0"
+  # Use Ubuntu 22.04 LTS (Jammy) - Bento box for better macOS compatibility
+  config.vm.box = "bento/ubuntu-22.04"
 
   # Hostname for the worker node
   config.vm.hostname = "swarm-worker"

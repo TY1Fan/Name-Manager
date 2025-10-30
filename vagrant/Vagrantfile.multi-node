@@ -1,0 +1,147 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# Multi-Node Docker Swarm Configuration
+# Creates 1 manager + 1 worker node
+# Both nodes can communicate directly
+
+Vagrant.configure("2") do |config|
+  # Use Bento Ubuntu for better macOS compatibility
+  config.vm.box = "bento/ubuntu-22.04"
+
+  # Manager Node Configuration
+  config.vm.define "manager" do |manager|
+    manager.vm.hostname = "swarm-manager"
+    manager.vm.network "private_network", ip: "192.168.56.11"
+    
+    manager.vm.provider "virtualbox" do |vb|
+      vb.name = "swarm-manager"
+      vb.memory = "2048"
+      vb.cpus = 2
+    end
+    
+    # Install Docker
+    manager.vm.provision "shell", inline: <<-SHELL
+      set -e
+      
+      echo "=== Installing Docker on Manager ==="
+      
+      # Update packages
+      apt-get update
+      
+      # Install Docker
+      curl -fsSL https://get.docker.com -o get-docker.sh
+      sh get-docker.sh
+      
+      # Add vagrant user to docker group
+      usermod -aG docker vagrant
+      
+      # Enable Docker service
+      systemctl enable docker
+      systemctl start docker
+      
+      echo "=== Docker installed successfully ==="
+      docker --version
+    SHELL
+    
+    # Initialize Swarm (run after Docker is installed)
+    manager.vm.provision "shell", run: "always", inline: <<-SHELL
+      echo "=== Checking Swarm Status ==="
+      
+      # Check if already in swarm
+      if docker info 2>/dev/null | grep -q "Swarm: active"; then
+        echo "Manager already in swarm"
+        docker node ls
+      else
+        echo "Initializing Docker Swarm..."
+        docker swarm init --advertise-addr 192.168.56.11
+        
+        # Save join token
+        docker swarm join-token worker -q > /vagrant/worker-token.txt
+        echo "192.168.56.11" > /vagrant/manager-ip.txt
+        
+        echo "Swarm initialized!"
+        docker node ls
+      fi
+      
+      # Create persistent storage directory
+      mkdir -p /var/lib/postgres-data
+      chown -R 999:999 /var/lib/postgres-data
+      
+      echo "=== Manager Node Ready ==="
+      echo "Manager IP: 192.168.56.11"
+    SHELL
+  end
+
+  # Worker Node Configuration
+  config.vm.define "worker" do |worker|
+    worker.vm.hostname = "swarm-worker"
+    worker.vm.network "private_network", ip: "192.168.56.12"
+    
+    worker.vm.provider "virtualbox" do |vb|
+      vb.name = "swarm-worker"
+      vb.memory = "2048"
+      vb.cpus = 2
+    end
+    
+    # Install Docker
+    worker.vm.provision "shell", inline: <<-SHELL
+      set -e
+      
+      echo "=== Installing Docker on Worker ==="
+      
+      # Update packages
+      apt-get update
+      
+      # Install Docker
+      curl -fsSL https://get.docker.com -o get-docker.sh
+      sh get-docker.sh
+      
+      # Add vagrant user to docker group
+      usermod -aG docker vagrant
+      
+      # Enable Docker service
+      systemctl enable docker
+      systemctl start docker
+      
+      echo "=== Docker installed successfully ==="
+      docker --version
+    SHELL
+    
+    # Join Swarm (run after Docker is installed)
+    worker.vm.provision "shell", run: "always", inline: <<-SHELL
+      echo "=== Checking Swarm Status ==="
+      
+      # Check if already in swarm
+      if docker info 2>/dev/null | grep -q "Swarm: active"; then
+        echo "Worker already in swarm"
+      else
+        # Wait for manager to be ready
+        echo "Waiting for manager to be ready..."
+        while [ ! -f /vagrant/worker-token.txt ] || [ ! -f /vagrant/manager-ip.txt ]; do
+          sleep 2
+        done
+        
+        # Get join command
+        TOKEN=$(cat /vagrant/worker-token.txt)
+        MANAGER_IP=$(cat /vagrant/manager-ip.txt)
+        
+        echo "Joining swarm at ${MANAGER_IP}..."
+        docker swarm join --token ${TOKEN} ${MANAGER_IP}:2377
+        
+        echo "Worker joined swarm!"
+      fi
+      
+      # Create persistent storage directory
+      mkdir -p /var/lib/postgres-data
+      chown -R 999:999 /var/lib/postgres-data
+      
+      echo "=== Worker Node Ready ==="
+      echo "Worker IP: 192.168.56.12"
+    SHELL
+  end
+  
+  # Synced folder for project files (from host to manager)
+  config.vm.synced_folder "../src", "/vagrant/src", create: true
+  config.vm.synced_folder "./backups", "/vagrant/backups", create: true
+end
