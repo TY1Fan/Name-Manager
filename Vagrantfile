@@ -13,8 +13,9 @@ Vagrant.configure("2") do |config|
     # Private network for inter-VM communication
     manager.vm.network "private_network", ip: "192.168.56.10"
     
-    # Port forwarding: host:8080 -> guest:80 (frontend)
-    manager.vm.network "forwarded_port", guest: 80, host: 8080
+    # Port forwarding: host:8081 -> guest:80 (frontend)
+    # Note: Using 8081 to avoid conflict with Docker Compose on 8080
+    manager.vm.network "forwarded_port", guest: 80, host: 8081
     
     # VirtualBox provider settings
     manager.vm.provider "virtualbox" do |vb|
