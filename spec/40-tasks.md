@@ -951,10 +951,10 @@ echo "Storage directory ready!"
 6. Check service logs for errors
 
 **Acceptance Criteria**:
-- [ ] Stack deploys without errors
-- [ ] All 3 services created (db, api, web)
-- [ ] All services reach Running state
-- [ ] No errors in service logs
+- [x] Stack deploys without errors (✅ deployed with stack name "names")
+- [x] All 3 services created (db, api, web) (✅ names_db, names_api, names_web)
+- [x] All services reach Running state (✅ 1/1 db, 2/2 api, 1/1 web)
+- [x] No errors in service logs (✅ all services running, API tested successfully)
 
 **Commands**:
 ```bash
