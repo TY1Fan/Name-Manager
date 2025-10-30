@@ -1872,10 +1872,10 @@ vagrant ssh manager -- docker service ps names-app_<service>
 - Common issues and solutions
 
 **Acceptance Criteria**:
-- [ ] Deployment process documented
-- [ ] Monitoring commands listed
-- [ ] Troubleshooting guide complete
-- [ ] Tested by following instructions
+- [x] Deployment process documented
+- [x] Monitoring commands listed
+- [x] Troubleshooting guide complete
+- [x] Tested by following instructions
 
 ---
 
