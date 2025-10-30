@@ -98,6 +98,48 @@ Comprehensive manual testing procedures are available in [`TESTING.md`](src/back
 3. **Security Test**: Try `<script>alert('test')</script>` - should be safely escaped
 4. **Health Check**: Visit http://localhost:8080/api/health
 
+## Production Deployment (Docker Swarm)
+
+For production deployment on a multi-node Docker Swarm cluster:
+
+### Prerequisites
+- Vagrant and VirtualBox for VM management
+- 2 VMs: manager node (192.168.56.10) and worker node (192.168.56.11)
+
+### Deployment Steps
+
+1. **Start VMs**:
+   ```bash
+   vagrant up
+   ```
+
+2. **Initialize Swarm** (first time only):
+   ```bash
+   ./ops/init-swarm.sh
+   ```
+
+3. **Build and deploy**:
+   ```bash
+   cd src
+   ./build-images.sh
+   # Transfer images to manager VM (see ops scripts)
+   vagrant ssh manager
+   docker stack deploy -c /vagrant/swarm/stack.yaml names
+   ```
+
+4. **Access application**:
+   - http://localhost:8081 (forwarded from manager VM)
+
+### Operational Scripts
+
+The `ops/` directory contains scripts for:
+- `init-swarm.sh` - Initialize Swarm cluster
+- `deploy.sh` - Deploy/update application stack
+- `backup-db.sh` - Backup database
+- `health-check.sh` - Monitor service health
+
+See [`ops/README.md`](ops/README.md) for detailed documentation.
+
 ## Contributing
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for development guidelines and contribution process.

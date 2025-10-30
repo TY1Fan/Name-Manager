@@ -1260,9 +1260,9 @@ docker-compose down
 - `ops/` directory
 
 **Acceptance Criteria**:
-- [ ] `ops/` directory exists at project root
-- [ ] Ready for operational scripts
-- [ ] Purpose documented
+- [x] `ops/` directory exists at project root
+- [x] Ready for operational scripts
+- [x] Purpose documented
 
 ---
 
