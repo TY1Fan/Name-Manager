@@ -279,9 +279,11 @@ engine = create_engine(DATABASE_URL, echo=DB_ECHO, future=True)
 ```bash
 vagrant --version
 VBoxManage --version
-vagrant init ubuntu/jammy64
+vagrant init bento/ubuntu-22.04
 vagrant status
 ```
+
+**Note**: Using `bento/ubuntu-22.04` for ARM compatibility (Apple Silicon Macs).
 
 ---
 
@@ -306,7 +308,7 @@ vagrant status
 ```ruby
 Vagrant.configure("2") do |config|
   config.vm.define "manager" do |manager|
-    manager.vm.box = "ubuntu/jammy64"
+    manager.vm.box = "bento/ubuntu-22.04"
     manager.vm.hostname = "swarm-manager"
     manager.vm.network "private_network", ip: "192.168.56.10"
     manager.vm.network "forwarded_port", guest: 80, host: 8080
@@ -319,7 +321,7 @@ Vagrant.configure("2") do |config|
   end
   
   config.vm.define "worker" do |worker|
-    worker.vm.box = "ubuntu/jammy64"
+    worker.vm.box = "bento/ubuntu-22.04"
     worker.vm.hostname = "swarm-worker"
     worker.vm.network "private_network", ip: "192.168.56.11"
     worker.vm.provider "virtualbox" do |vb|
