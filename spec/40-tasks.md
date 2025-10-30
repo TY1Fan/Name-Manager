@@ -989,10 +989,10 @@ docker stack ls
 5. Document actual placement
 
 **Acceptance Criteria**:
-- [ ] DB service on worker node (labeled role=db)
-- [ ] API service on manager node (2 replicas)
-- [ ] Web service on manager node (1 replica)
-- [ ] Placement matches requirements
+- [x] DB service on worker node (labeled role=db)
+- [x] API service on manager node (2 replicas)
+- [x] Web service on manager node (1 replica)
+- [x] Placement matches requirements
 
 **Commands**:
 ```bash
