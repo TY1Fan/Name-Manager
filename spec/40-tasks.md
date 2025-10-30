@@ -1471,12 +1471,12 @@ echo "To verify deployment, run: ops/verify.sh"
 ```
 
 **Acceptance Criteria**:
-- [ ] Script builds images
-- [ ] Script transfers images to manager
-- [ ] Script deploys stack from `swarm/stack.yaml`
-- [ ] Script verifies deployment
-- [ ] Script shows service status
-- [ ] Single command deploys everything
+- [x] Script builds images
+- [x] Script transfers images to manager
+- [x] Script deploys stack from `swarm/stack.yaml`
+- [x] Script verifies deployment
+- [x] Script shows service status
+- [x] Single command deploys everything
 
 ---
 
