@@ -4,9 +4,13 @@ services:
   db:
     image: postgres:15
     environment:
-      POSTGRES_USER: names_user
-      POSTGRES_PASSWORD: names_pass
-      POSTGRES_DB: namesdb
+      POSTGRES_USER_FILE: /run/secrets/postgres_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_DB_FILE: /run/secrets/postgres_db
+    secrets:
+      - postgres_user
+      - postgres_password
+      - postgres_db
     volumes:
       - dbdata:/var/lib/postgresql/data
     networks:
@@ -89,3 +93,11 @@ volumes:
       type: none
       o: bind
       device: /var/lib/postgres-data
+
+secrets:
+  postgres_user:
+    external: true
+  postgres_password:
+    external: true
+  postgres_db:
+    external: true

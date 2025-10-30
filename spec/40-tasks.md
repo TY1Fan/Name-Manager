@@ -1728,10 +1728,10 @@ echo "To redeploy: ops/deploy.sh"
 5. Verify functionality
 
 **Acceptance Criteria**:
-- [ ] Secrets created in Swarm
-- [ ] Stack file uses secrets (no plaintext passwords)
-- [ ] Application works with secrets
-- [ ] Database connection successful
+- [x] Secrets created in Swarm
+- [x] Stack file uses secrets (no plaintext passwords)
+- [x] Application works with secrets
+- [x] Database connection successful
 
 **Commands**:
 ```bash
