@@ -1834,12 +1834,12 @@ vagrant ssh manager -- docker service ps names-app_<service>
 ```
 
 **Acceptance Criteria**:
-- [ ] README documents both development and production workflows
-- [ ] ops scripts documented
-- [ ] compose.yaml preserved for local development
-- [ ] swarm/stack.yaml documented for production
-- [ ] Clear separation between dev and prod
-- [ ] Troubleshooting commands included
+- [x] README documents both development and production workflows
+- [x] ops scripts documented
+- [x] compose.yaml preserved for local development
+- [x] swarm/stack.yaml documented for production
+- [x] Clear separation between dev and prod
+- [x] Troubleshooting commands included
 
 ---
 
