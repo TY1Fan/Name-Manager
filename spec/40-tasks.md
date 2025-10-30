@@ -1070,10 +1070,10 @@ docker exec $(docker ps -q -f name=names-app_api | head -1) \
 5. Document health check status
 
 **Acceptance Criteria**:
-- [ ] GET /api/health returns `{"status":"ok"}` exactly
-- [ ] GET /api/health/db returns healthy status
-- [ ] PostgreSQL health check passes (pg_isready)
-- [ ] HTTP status codes correct (200 for healthy)
+- [x] GET /api/health returns `{"status":"ok"}` exactly
+- [x] GET /api/health/db returns healthy status
+- [x] PostgreSQL health check passes (pg_isready)
+- [x] HTTP status codes correct (200 for healthy)
 
 **Commands**:
 ```bash
