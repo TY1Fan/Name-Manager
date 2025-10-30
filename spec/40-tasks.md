@@ -1177,12 +1177,12 @@ curl http://localhost:8080/api/names | grep "Persistence Test"
 7. Document test results
 
 **Acceptance Criteria**:
-- [ ] Application accessible at http://localhost:8080
-- [ ] Can add names (web → api → db across VMs)
-- [ ] Names display with timestamps
-- [ ] Can delete names by ID
-- [ ] Error messages display correctly
-- [ ] All CRUD operations work
+- [x] Application accessible at http://localhost:8080
+- [x] Can add names (web → api → db across VMs)
+- [x] Names display with timestamps
+- [x] Can delete names by ID
+- [x] Error messages display correctly
+- [x] All CRUD operations work
 
 **Test Checklist**:
 ```
