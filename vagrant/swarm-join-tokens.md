@@ -15,6 +15,15 @@ docker swarm join --token SWMTKN-1-3aqd8iwtuv58ymeh8n8onbfvkkqcjtpp1etuiw9zpfwsq
 - **Manager Status**: Leader
 - **Engine Version**: 28.5.1
 
+## Worker Node
+- **Node ID**: m4thvdx2thshjvoo4f69c4poe
+- **Hostname**: swarm-worker
+- **IP Address**: 192.168.56.11
+- **Status**: Ready / Active
+- **Manager Status**: -
+- **Engine Version**: 28.5.1
+- **Labels**: `role=db` (for database placement constraints)
+
 ## To Retrieve Tokens Later
 
 If you need to retrieve the join token again:

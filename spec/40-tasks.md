@@ -492,10 +492,10 @@ docker node ls
 4. Should see 2 nodes (1 manager, 1 worker)
 
 **Acceptance Criteria**:
-- [ ] Worker joins Swarm successfully
-- [ ] `docker node ls` shows 2 nodes
-- [ ] Manager shows as Leader
-- [ ] Worker shows as Active
+- [x] Worker joins Swarm successfully (✅ "This node joined a swarm as a worker")
+- [x] `docker node ls` shows 2 nodes (✅ swarm-manager + swarm-worker)
+- [x] Manager shows as Leader (✅ MANAGER STATUS: Leader)
+- [x] Worker shows as Active (✅ STATUS: Ready, AVAILABILITY: Active)
 
 **Commands**:
 ```bash
@@ -528,9 +528,9 @@ docker node ls
 4. Verify label: `docker node inspect <worker-node-id> --format '{{.Spec.Labels}}'`
 
 **Acceptance Criteria**:
-- [ ] Worker node labeled with `role=db`
-- [ ] Label visible in node inspection
-- [ ] Label will be used for db service placement
+- [x] Worker node labeled with `role=db` (✅ label added)
+- [x] Label visible in node inspection (✅ map[role:db])
+- [x] Label will be used for db service placement (✅ ready for stack deployment)
 
 **Commands**:
 ```bash
