@@ -1360,13 +1360,13 @@ echo "Next step: Run 'ops/deploy.sh' to deploy the application"
 ```
 
 **Acceptance Criteria**:
-- [ ] Script initializes Swarm on manager
-- [ ] Script joins worker to Swarm
-- [ ] Script labels worker with `role=db`
-- [ ] Script creates overlay network `appnet`
-- [ ] Script creates storage directory
-- [ ] Script is idempotent (can run multiple times)
-- [ ] Script verifies each step
+- [x] Script initializes Swarm on manager
+- [x] Script joins worker to Swarm
+- [x] Script labels worker with `role=db`
+- [x] Script creates overlay network `appnet`
+- [x] Script creates storage directory
+- [x] Script is idempotent (can run multiple times)
+- [x] Script verifies each step
 
 ---
 
