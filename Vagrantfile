@@ -23,8 +23,8 @@ Vagrant.configure("2") do |config|
       vb.name = "names-manager"
     end
     
-    # Docker installation provisioning (Task 1.3)
-    # manager.vm.provision "shell", path: "vagrant/install-docker.sh"
+    # Docker installation provisioning
+    manager.vm.provision "shell", path: "vagrant/install-docker.sh"
   end
   
   # Worker Node Configuration
@@ -42,7 +42,7 @@ Vagrant.configure("2") do |config|
       vb.name = "names-worker"
     end
     
-    # Docker installation provisioning (Task 1.3)
-    # worker.vm.provision "shell", path: "vagrant/install-docker.sh"
+    # Docker installation provisioning
+    worker.vm.provision "shell", path: "vagrant/install-docker.sh"
   end
 end
