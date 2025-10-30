@@ -1030,10 +1030,10 @@ docker service inspect names-app_db --format '{{.Spec.TaskTemplate.Placement}}'
 5. Document DNS resolution
 
 **Acceptance Criteria**:
-- [ ] API container can ping/resolve `db`
-- [ ] Web container can ping/resolve `api`
-- [ ] DATABASE_URL environment uses service name `db`
-- [ ] DNS resolution works across VMs
+- [x] API container can ping/resolve `db`
+- [x] Web container can ping/resolve `api`
+- [x] DATABASE_URL environment uses service name `db`
+- [x] DNS resolution works across VMs
 
 **Commands**:
 ```bash
