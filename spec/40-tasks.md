@@ -1635,12 +1635,12 @@ fi
 ```
 
 **Acceptance Criteria**:
-- [ ] Script checks stack deployment
-- [ ] Script verifies service placement
-- [ ] Script tests health endpoints
-- [ ] Script verifies network and storage
-- [ ] Script reports pass/fail status
-- [ ] Script provides debug hints on failure
+- [x] Script checks stack deployment
+- [x] Script verifies service placement
+- [x] Script tests health endpoints
+- [x] Script verifies network and storage
+- [x] Script reports pass/fail status
+- [x] Script provides debug hints on failure
 
 ---
 
