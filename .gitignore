@@ -1,1 +1,8 @@
 .env
+
+# Vagrant
+.vagrant/
+
+# Swarm tokens (contains secrets)
+vagrant/swarm-join-tokens.md
+
