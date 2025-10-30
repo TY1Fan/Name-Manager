@@ -909,10 +909,10 @@ rm names-backend.tar.gz names-frontend.tar.gz
 6. Test writability
 
 **Acceptance Criteria**:
-- [ ] Directory exists at `/var/lib/postgres-data` on worker only
-- [ ] Permissions are 700 (drwx------)
-- [ ] Owner is 999:999 (PostgreSQL UID/GID)
-- [ ] Directory is writable by UID 999
+- [x] Directory exists at `/var/lib/postgres-data` on worker only (✅ created on worker VM)
+- [x] Permissions are 700 (drwx------) (✅ verified with stat: 700)
+- [x] Owner is 999:999 (PostgreSQL UID/GID) (✅ verified with stat: 999:999)
+- [x] Directory is writable by UID 999 (✅ tested with touch/rm as UID 999)
 
 **Commands**:
 ```bash
