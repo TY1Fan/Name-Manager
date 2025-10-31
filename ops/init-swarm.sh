@@ -19,7 +19,7 @@ if echo "$SWARM_INIT_OUTPUT" | grep -q "already initialized"; then
     JOIN_TOKEN=$(vagrant ssh manager -c "docker swarm join-token worker -q")
 else
     echo "Swarm initialized successfully."
-    JOIN_TOKEN=$(echo "$SWARM_INIT_OUTPUT" | grep -oP 'SWMTKN-[^ ]+')
+    JOIN_TOKEN=$(vagrant ssh manager -c "docker swarm join-token worker -q")
 fi
 
 echo "Worker join token: $JOIN_TOKEN"
