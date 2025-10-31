@@ -6,9 +6,14 @@ from flask import Flask, request, jsonify
 from sqlalchemy import create_engine, Table, Column, Integer, Text, TIMESTAMP, MetaData, select, func
 
 # Configuration from environment variables
-DB_URL = os.environ.get(
-    "DB_URL",
-    "postgresql+psycopg2://names_user:names_pass@db:5432/namesdb"
+# Support both DATABASE_URL (Swarm/standard) and DB_URL (legacy Compose)
+# DATABASE_URL takes priority for compatibility with Docker Swarm deployments
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    os.environ.get(
+        "DB_URL",
+        "postgresql+psycopg2://names_user:names_pass@db:5432/namesdb"
+    )
 )
 
 MAX_NAME_LENGTH = int(os.environ.get("MAX_NAME_LENGTH", "50"))
@@ -17,7 +22,7 @@ LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 SERVER_HOST = os.environ.get("SERVER_HOST", "0.0.0.0")
 SERVER_PORT = int(os.environ.get("SERVER_PORT", "8000"))
 
-engine = create_engine(DB_URL, echo=DB_ECHO, future=True)
+engine = create_engine(DATABASE_URL, echo=DB_ECHO, future=True)
 metadata = MetaData()
 
 table = Table(
@@ -154,7 +159,7 @@ def list_names():
             })
 
         logger.info(f"GET /api/names - Successfully retrieved {len(results)} names")
-        return jsonify(results)
+        return jsonify({"names": results}), 200
     
     except Exception as e:
         logger.error(f"GET /api/names - Database error: {str(e)}")
@@ -181,21 +186,11 @@ def delete_name(name_id):
         return jsonify({"error": "Internal server error"}), 500
 
 @app.route("/api/health", methods=["GET"])
+@app.route("/healthz", methods=["GET"])
 def health_check():
-    """Basic health check endpoint that returns application status."""
-    logger.info("GET /api/health - Health check requested")
-    
-    from datetime import datetime, timezone
-    
-    response = {
-        "status": "healthy",
-        "service": "Names Manager API",
-        "version": "1.0.0",
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    }
-    
-    logger.info("GET /api/health - Application is healthy")
-    return jsonify(response), 200
+    """Basic health check endpoint."""
+    logger.info("Health check requested")
+    return jsonify({"status": "ok"}), 200
 
 @app.route("/api/health/db", methods=["GET"])
 def health_check_db():
@@ -214,7 +209,7 @@ def health_check_db():
             "service": "Names Manager API - Database",
             "database": "connected",
             "db_time": str(db_time),
-            "connection_url": DB_URL.split('@')[1] if '@' in DB_URL else "configured"  # Hide credentials
+            "connection_url": DATABASE_URL.split('@')[1] if '@' in DATABASE_URL else "configured"  # Hide credentials
         }
         
         logger.info("GET /api/health/db - Database connection successful")

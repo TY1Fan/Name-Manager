@@ -1,0 +1,70 @@
+# Docker Swarm Join Tokens
+
+⚠️ **SECURITY NOTE**: This file contains sensitive tokens. It is gitignored and should never be committed.
+
+## How to Retrieve Tokens
+
+If you need to get the join tokens for your Swarm cluster, run these commands:
+
+### Worker Join Token
+
+```bash
+vagrant ssh manager -c "docker swarm join-token worker"
+```
+
+This will output:
+```
+To add a worker to this swarm, run the following command:
+
+    docker swarm join --token <WORKER-TOKEN> 192.168.56.10:2377
+```
+
+### Manager Join Token
+
+```bash
+vagrant ssh manager -c "docker swarm join-token manager"
+```
+
+This will output:
+```
+To add a manager to this swarm, run the following command:
+
+    docker swarm join --token <MANAGER-TOKEN> 192.168.56.10:2377
+```
+
+## Usage
+
+To join the worker node to the swarm:
+
+```bash
+# Get the token
+TOKEN=$(vagrant ssh manager -c "docker swarm join-token worker -q")
+
+# Join the worker
+vagrant ssh worker -c "docker swarm join --token $TOKEN 192.168.56.10:2377"
+```
+
+## Node Information
+
+After joining, verify the cluster:
+
+```bash
+vagrant ssh manager -c "docker node ls"
+```
+
+## Security Best Practices
+
+1. **Never commit tokens**: Keep this file gitignored
+2. **Rotate tokens**: If tokens are exposed, rotate them:
+   ```bash
+   vagrant ssh manager -c "docker swarm join-token --rotate worker"
+   ```
+3. **Use temporary tokens**: Tokens are only needed during node setup
+4. **Retrieve on demand**: Always get fresh tokens when needed
+
+## Cluster Information
+
+- **Manager Node**: 192.168.56.10 (swarm-manager)
+- **Worker Node**: 192.168.56.11 (swarm-worker)
+- **Swarm Port**: 2377
+- **Overlay Network**: appnet (10.0.1.0/24)

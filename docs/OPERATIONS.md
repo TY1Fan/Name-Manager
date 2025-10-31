@@ -1,0 +1,582 @@
+# Operations Guide - Names Manager
+
+This document provides comprehensive operational procedures for managing the Names Manager application in a Docker Swarm environment.
+
+## Table of Contents
+
+1. [Architecture Overview](#architecture-overview)
+2. [Deployment Procedures](#deployment-procedures)
+3. [Service Management](#service-management)
+4. [Monitoring & Health Checks](#monitoring--health-checks)
+5. [Scaling Operations](#scaling-operations)
+6. [Rolling Updates](#rolling-updates)
+7. [Rollback Procedures](#rollback-procedures)
+8. [Backup & Restore](#backup--restore)
+9. [Troubleshooting](#troubleshooting)
+10. [Common Issues & Solutions](#common-issues--solutions)
+
+---
+
+## Architecture Overview
+
+### Environment Structure
+
+**Local Development (Single-Host):**
+- Uses `src/docker-compose.yml`
+- All services on one machine
+- Port: 8080
+- Storage: Docker volume
+
+**Production (Multi-Host Swarm):**
+- Uses `swarm/stack.yaml`
+- 2 VMs: manager (192.168.56.10) + worker (192.168.56.11)
+- Port: 8081 (forwarded from manager VM port 80)
+- Storage: Bind mount at `/var/lib/postgres-data` on worker
+
+### Service Placement
+
+| Service | Replicas | Node | Constraint |
+|---------|----------|------|------------|
+| `names_db` | 1 | Worker | `node.labels.role == db` |
+| `names_api` | 2 | Manager | `node.role == manager` |
+| `names_web` | 1 | Manager | `node.role == manager` |
+
+### Network Architecture
+
+- **Overlay Network**: `appnet` (10.0.1.0/24)
+- **DNS**: Automatic service discovery
+- **Ingress**: Port 80 published on manager
+
+---
+
+## Deployment Procedures
+
+### Initial Deployment (From Scratch)
+
+```bash
+# 1. Start Virtual Machines
+vagrant up
+
+# 2. Initialize Swarm Cluster
+./ops/init-swarm.sh
+
+# Expected output:
+# - Swarm initialized on manager
+# - Worker joined to Swarm
+# - Worker labeled with role=db
+# - Overlay network 'appnet' created
+# - Storage directory created on worker
+
+# 3. Deploy Application
+./ops/deploy.sh
+
+# Expected output:
+# - Images built (backend + frontend)
+# - Images transferred to manager
+# - Stack deployed
+# - Services: api (2/2), db (1/1), web (1/1)
+
+# 4. Verify Deployment
+./ops/verify.sh
+
+# Expected output:
+# - All 10 checks passed
+# - Application accessible at http://localhost:8081
+```
+
+### Redeployment (Update Existing)
+
+```bash
+# Redeploy with latest code changes
+./ops/deploy.sh
+
+# This will:
+# - Rebuild images with latest code
+# - Transfer new images to manager
+# - Update services (rolling update)
+# - Maintain data persistence
+```
+
+---
+
+## Service Management
+
+### View Service Status
+
+```bash
+# List all services
+vagrant ssh manager -c "docker stack services names"
+
+# View specific service details
+vagrant ssh manager -c "docker service ps names_api"
+vagrant ssh manager -c "docker service ps names_db"
+vagrant ssh manager -c "docker service ps names_web"
+
+# Inspect service configuration
+vagrant ssh manager -c "docker service inspect names_api"
+```
+
+### Service Logs
+
+```bash
+# View logs for a service
+vagrant ssh manager -c "docker service logs names_api"
+vagrant ssh manager -c "docker service logs names_db"
+vagrant ssh manager -c "docker service logs names_web"
+
+# Follow logs in real-time
+vagrant ssh manager -c "docker service logs -f names_api"
+
+# View last N lines
+vagrant ssh manager -c "docker service logs --tail 50 names_api"
+
+# View logs since timestamp
+vagrant ssh manager -c "docker service logs --since 10m names_api"
+```
+
+### Restart Services
+
+```bash
+# Force restart a service (refreshes containers)
+vagrant ssh manager -c "docker service update --force names_api"
+vagrant ssh manager -c "docker service update --force names_db"
+vagrant ssh manager -c "docker service update --force names_web"
+
+# Note: Use --force when database connections are stale
+```
+
+---
+
+## Monitoring & Health Checks
+
+### Application Health Checks
+
+```bash
+# Basic API health
+curl http://localhost:8081/api/health
+# Expected: {"status":"ok"}
+
+# Database connectivity health
+curl http://localhost:8081/api/health/db
+# Expected: {"status":"healthy", "database":"connected", ...}
+
+# Test data operations
+curl http://localhost:8081/api/names
+# Expected: {"names":[...]}
+```
+
+### Service Health Status
+
+```bash
+# Check if all services are running
+vagrant ssh manager -c "docker stack ps names --filter 'desired-state=running'"
+
+# Check for failed services
+vagrant ssh manager -c "docker stack ps names --filter 'desired-state=shutdown'"
+
+# View service events
+vagrant ssh manager -c "docker service ps names_api --no-trunc"
+```
+
+### Database Health
+
+```bash
+# PostgreSQL health check
+vagrant ssh worker -c "docker exec \$(docker ps -q -f name=names_db) pg_isready -U names_user -d namesdb"
+# Expected: /var/run/postgresql:5432 - accepting connections
+
+# Check database connections
+vagrant ssh worker -c "docker exec \$(docker ps -q -f name=names_db) psql -U names_user -d namesdb -c 'SELECT count(*) FROM names;'"
+```
+
+### Network Connectivity
+
+```bash
+# Test DNS resolution
+vagrant ssh manager -c "docker exec \$(docker ps -q -f name=names_api | head -1) python -c 'import socket; print(socket.gethostbyname(\"names_db\"))'"
+
+# Test cross-VM connectivity
+vagrant ssh manager -c "docker exec \$(docker ps -q -f name=names_api | head -1) python -c 'import psycopg2; conn = psycopg2.connect(\"postgresql://names_user:names_pass@db:5432/namesdb\"); print(\"Connected!\")'"
+```
+
+### Resource Usage
+
+```bash
+# Check node resources
+vagrant ssh manager -c "docker node ls"
+vagrant ssh manager -c "docker node inspect swarm-manager --format '{{.Status}}'"
+
+# Check service resource usage (requires metrics)
+vagrant ssh manager -c "docker stats --no-stream"
+```
+
+---
+
+## Scaling Operations
+
+### Scale Services
+
+```bash
+# Scale API service to 3 replicas
+vagrant ssh manager -c "docker service scale names_api=3"
+
+# Scale down to 1 replica
+vagrant ssh manager -c "docker service scale names_api=1"
+
+# Note: Database should remain at 1 replica (stateful service)
+
+# Verify scaling
+vagrant ssh manager -c "docker service ps names_api"
+```
+
+### Auto-Scaling Considerations
+
+The current setup does not include auto-scaling. For production:
+- Consider Docker Swarm mode's `--replicas-max-per-node`
+- Implement external monitoring (Prometheus + Grafana)
+- Use horizontal pod autoscaling based on CPU/memory
+
+---
+
+## Rolling Updates
+
+### Update Application Code
+
+```bash
+# 1. Make code changes in src/backend/ or src/frontend/
+
+# 2. Deploy with rolling update (default behavior)
+./ops/deploy.sh
+
+# Rolling update configuration in stack.yaml:
+# - parallelism: 1 (update one replica at a time)
+# - delay: 10s (wait between updates)
+# - failure_action: rollback (automatic rollback on failure)
+```
+
+### Update Configuration
+
+```bash
+# Update environment variables
+vagrant ssh manager -c "docker service update --env-add NEW_VAR=value names_api"
+
+# Update image version
+vagrant ssh manager -c "docker service update --image localhost/names-backend:v2 names_api"
+```
+
+### Monitor Update Progress
+
+```bash
+# Watch update progress
+vagrant ssh manager -c "watch docker service ps names_api"
+
+# Check update status
+vagrant ssh manager -c "docker service inspect names_api --format '{{.UpdateStatus}}'"
+```
+
+---
+
+## Rollback Procedures
+
+### Automatic Rollback
+
+The stack is configured with automatic rollback on failure:
+```yaml
+rollback_config:
+  parallelism: 1
+  delay: 10s
+```
+
+### Manual Rollback
+
+```bash
+# Rollback to previous version
+vagrant ssh manager -c "docker service rollback names_api"
+
+# Check rollback status
+vagrant ssh manager -c "docker service ps names_api"
+
+# View service history
+vagrant ssh manager -c "docker service ps names_api --no-trunc"
+```
+
+### Complete Stack Rollback
+
+```bash
+# 1. Remove current stack
+./ops/cleanup.sh
+
+# 2. Restore previous stack.yaml version
+git checkout HEAD~1 swarm/stack.yaml
+
+# 3. Redeploy
+./ops/deploy.sh
+
+# 4. Restore to latest
+git checkout swarm/stack.yaml
+```
+
+---
+
+## Backup & Restore
+
+### Database Backup
+
+```bash
+# Create backup
+vagrant ssh worker -c "docker exec \$(docker ps -q -f name=names_db) pg_dump -U names_user namesdb > /home/vagrant/backup_\$(date +%Y%m%d_%H%M%S).sql"
+
+# Copy backup to host
+vagrant scp worker:/home/vagrant/backup_*.sql ./backups/
+
+# Backup data directory
+vagrant ssh worker -c "sudo tar czf /home/vagrant/postgres-data-backup.tar.gz /var/lib/postgres-data"
+```
+
+### Database Restore
+
+```bash
+# Copy backup to worker
+vagrant scp ./backups/backup_20251030.sql worker:/home/vagrant/
+
+# Restore database
+vagrant ssh worker -c "cat backup_20251030.sql | docker exec -i \$(docker ps -q -f name=names_db) psql -U names_user -d namesdb"
+
+# Verify restore
+curl http://localhost:8081/api/names
+```
+
+### Complete System Backup
+
+```bash
+# Backup includes:
+# 1. Stack configuration
+cp swarm/stack.yaml backups/stack.yaml.$(date +%Y%m%d)
+
+# 2. Database data
+vagrant ssh worker -c "sudo tar czf /home/vagrant/postgres-backup.tar.gz /var/lib/postgres-data"
+vagrant scp worker:/home/vagrant/postgres-backup.tar.gz ./backups/
+
+# 3. Docker images (optional)
+docker save localhost/names-backend:latest | gzip > backups/backend.tar.gz
+docker save localhost/names-frontend:latest | gzip > backups/frontend.tar.gz
+```
+
+---
+
+## Troubleshooting
+
+### Services Not Starting
+
+**Symptoms**: Service replicas showing 0/N
+
+```bash
+# 1. Check service logs
+vagrant ssh manager -c "docker service logs names_api"
+
+# 2. Check for errors
+vagrant ssh manager -c "docker service ps names_api --no-trunc"
+
+# 3. Verify image exists
+vagrant ssh manager -c "docker images | grep names"
+
+# 4. Check node availability
+vagrant ssh manager -c "docker node ls"
+
+# Common fixes:
+# - Restart service: docker service update --force names_api
+# - Rebuild and redeploy: ./ops/deploy.sh
+```
+
+### Database Connection Errors
+
+**Symptoms**: API shows "server closed the connection unexpectedly"
+
+```bash
+# 1. Check database health
+vagrant ssh worker -c "docker exec \$(docker ps -q -f name=names_db) pg_isready -U names_user -d namesdb"
+
+# 2. Restart API to refresh connections
+vagrant ssh manager -c "docker service update --force names_api"
+
+# 3. Check database logs
+vagrant ssh manager -c "docker service logs names_db"
+
+# 4. Verify DNS resolution
+vagrant ssh manager -c "docker exec \$(docker ps -q -f name=names_api | head -1) nslookup names_db"
+```
+
+### Network Issues
+
+**Symptoms**: Services can't communicate
+
+```bash
+# 1. Verify overlay network
+vagrant ssh manager -c "docker network ls | grep appnet"
+vagrant ssh manager -c "docker network inspect appnet"
+
+# 2. Check service network connectivity
+vagrant ssh manager -c "docker exec \$(docker ps -q -f name=names_api | head -1) ping -c 3 names_db"
+
+# 3. Recreate network if needed
+vagrant ssh manager -c "docker network rm appnet"
+./ops/init-swarm.sh
+```
+
+### Port Conflicts
+
+**Symptoms**: "port is already allocated"
+
+```bash
+# 1. Check what's using the port
+vagrant ssh manager -c "sudo lsof -i :80"
+
+# 2. Stop conflicting service
+vagrant ssh manager -c "docker service rm <conflicting-service>"
+
+# 3. Redeploy
+./ops/deploy.sh
+```
+
+### Storage Issues
+
+**Symptoms**: Database fails to start, permission errors
+
+```bash
+# 1. Check storage directory
+vagrant ssh worker -c "sudo ls -ld /var/lib/postgres-data"
+
+# 2. Check permissions (should be 700, 999:999)
+vagrant ssh worker -c "sudo stat -c '%a %u %g' /var/lib/postgres-data"
+
+# 3. Fix permissions
+vagrant ssh worker -c "sudo chmod 700 /var/lib/postgres-data"
+vagrant ssh worker -c "sudo chown 999:999 /var/lib/postgres-data"
+
+# 4. Restart database
+vagrant ssh manager -c "docker service update --force names_db"
+```
+
+---
+
+## Common Issues & Solutions
+
+### Issue: "Swarm not initialized"
+
+**Solution**:
+```bash
+./ops/init-swarm.sh
+```
+
+### Issue: "Images not found on manager"
+
+**Solution**:
+```bash
+# Rebuild and transfer images
+./ops/deploy.sh
+```
+
+### Issue: "Worker not joining swarm"
+
+**Solution**:
+```bash
+# Leave and rejoin
+vagrant ssh worker -c "docker swarm leave"
+./ops/init-swarm.sh
+```
+
+### Issue: "Data lost after stack removal"
+
+**Explanation**: By design, `./ops/cleanup.sh` preserves data in `/var/lib/postgres-data`
+
+**Verification**:
+```bash
+vagrant ssh worker -c "sudo ls -lh /var/lib/postgres-data"
+```
+
+### Issue: "Port 8081 not accessible"
+
+**Solution**:
+```bash
+# 1. Verify Vagrant port forwarding
+vagrant port manager
+
+# 2. Check service is running
+vagrant ssh manager -c "curl localhost/api/health"
+
+# 3. Restart Vagrant networking
+vagrant reload
+```
+
+### Issue: "Services on wrong nodes"
+
+**Solution**:
+```bash
+# 1. Verify node labels
+vagrant ssh manager -c "docker node inspect swarm-worker --format '{{.Spec.Labels}}'"
+
+# 2. Re-label if needed
+vagrant ssh manager -c "docker node update --label-add role=db swarm-worker"
+
+# 3. Force service update
+vagrant ssh manager -c "docker service update --force names_db"
+```
+
+### Issue: "Stack deployment fails"
+
+**Solution**:
+```bash
+# 1. Check stack file syntax
+vagrant ssh manager -c "docker stack config -c /vagrant/swarm/stack.yaml"
+
+# 2. Verify network exists
+vagrant ssh manager -c "docker network ls | grep appnet"
+
+# 3. Check for conflicting stacks
+vagrant ssh manager -c "docker stack ls"
+
+# 4. Remove and redeploy
+./ops/cleanup.sh
+./ops/deploy.sh
+```
+
+---
+
+## Quick Reference
+
+### Essential Commands
+
+```bash
+# Deployment
+./ops/init-swarm.sh    # Initialize cluster (first time)
+./ops/deploy.sh        # Deploy/update application
+./ops/verify.sh        # Verify deployment
+./ops/cleanup.sh       # Remove stack
+
+# Monitoring
+curl http://localhost:8081/api/health
+vagrant ssh manager -c "docker stack services names"
+vagrant ssh manager -c "docker service logs names_api"
+
+# Troubleshooting
+vagrant ssh manager -c "docker service ps names_api --no-trunc"
+vagrant ssh manager -c "docker node ls"
+vagrant ssh worker -c "docker ps"
+
+# Cleanup
+./ops/cleanup.sh                                    # Remove stack only
+vagrant ssh worker -c "sudo rm -rf /var/lib/postgres-data"  # Remove data
+vagrant destroy -f                                  # Destroy VMs
+```
+
+---
+
+## Support & Additional Resources
+
+- **Project README**: `README.md`
+- **Task Specifications**: `spec/40-tasks.md`
+- **Operations Scripts**: `ops/` directory
+- **Stack Configuration**: `swarm/stack.yaml`
+- **Compose File**: `src/docker-compose.yml`
+
+For issues not covered in this guide, check service logs and the troubleshooting section above.
