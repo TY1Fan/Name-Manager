@@ -12,7 +12,7 @@ GitGuardian detected exposed secrets in the repository:
 
 2. **Docker Swarm Join Token**
    - Location: `vagrant/swarm-join-tokens.md`
-   - Token: `SWMTKN-1-3aqd8iwtuv58ymeh8n8onbfvkkqcjtpp1etuiw9zpfwsqeqvm2-5io45whb1mmdz3vwl1ekustlk`
+   - Token: `xxx`
 
 ### Remediation Actions Taken
 
@@ -39,8 +39,8 @@ Created `vagrant/swarm-join-tokens.md.template` with:
 
 #### 4. Rotate Exposed Tokens
 - Rotated worker join token on October 30, 2025
-- Old token: `SWMTKN-1-3aqd8iwtuv58ymeh8n8onbfvkkqcjtpp1etuiw9zpfwsqeqvm2-5io45whb1mmdz3vwl1ekustlk`
-- New token: `SWMTKN-1-3aqd8iwtuv58ymeh8n8onbfvkkqcjtpp1etuiw9zpfwsqeqvm2-310q1s2e730u7q205ze1zznzw`
+- Old token: `xxx`
+- New token: `xxx`
 - Verified cluster connectivity after rotation: ✅ Both nodes still active
 
 ### Impact Assessment
