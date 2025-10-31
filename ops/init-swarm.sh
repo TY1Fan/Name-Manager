@@ -16,17 +16,24 @@ SWARM_INIT_OUTPUT=$(vagrant ssh manager -c "docker swarm init --advertise-addr 1
 
 if echo "$SWARM_INIT_OUTPUT" | grep -q "already initialized"; then
     echo "Swarm already initialized on manager."
-    JOIN_TOKEN=$(vagrant ssh manager -c "docker swarm join-token worker -q")
 else
     echo "Swarm initialized successfully."
-    JOIN_TOKEN=$(vagrant ssh manager -c "docker swarm join-token worker -q")
 fi
 
-echo "Worker join token: $JOIN_TOKEN"
+# Get join token (clean it from carriage returns)
+JOIN_TOKEN=$(vagrant ssh manager -c "docker swarm join-token worker -q 2>/dev/null" | tr -d '\r')
+echo "Worker join token obtained."
 
 # Join worker to Swarm
 echo "Step 2: Joining worker node to Swarm..."
-vagrant ssh worker -c "docker swarm join --token $JOIN_TOKEN 192.168.56.10:2377 2>&1" || echo "Worker already joined."
+JOIN_RESULT=$(vagrant ssh worker -c "docker swarm join --token $JOIN_TOKEN 192.168.56.10:2377 2>&1")
+if echo "$JOIN_RESULT" | grep -q "This node joined"; then
+    echo "Worker successfully joined Swarm."
+elif echo "$JOIN_RESULT" | grep -q "already part of a swarm"; then
+    echo "Worker already in Swarm."
+else
+    echo "Join result: $JOIN_RESULT"
+fi
 
 # Wait for nodes to be ready
 echo "Step 3: Waiting for nodes to be ready..."
@@ -59,6 +66,15 @@ sudo chmod 700 /var/lib/postgres-data
 sudo chown 999:999 /var/lib/postgres-data
 ls -ld /var/lib/postgres-data
 EOF
+
+# Create Docker secrets
+echo "Step 8: Creating Docker secrets..."
+echo "names_user" | vagrant ssh manager -c "docker secret create postgres_user - 2>&1" || echo "postgres_user secret already exists."
+echo "names_pass" | vagrant ssh manager -c "docker secret create postgres_password - 2>&1" || echo "postgres_password secret already exists."
+echo "namesdb" | vagrant ssh manager -c "docker secret create postgres_db - 2>&1" || echo "postgres_db secret already exists."
+
+# Verify secrets
+vagrant ssh manager -c "docker secret ls"
 
 echo ""
 echo "=== Swarm Cluster Initialized Successfully ==="
