@@ -1,303 +1,385 @@
-# Names Manager - Task List: Docker Swarm Migration
+# Names Manager - Task List: k3s (Kubernetes) Migration
 
 ## Overview
-This document breaks down the Docker Swarm migration plan into small, actionable tasks. Each task corresponds to specific milestones from the implementation plan (30-plan.md).
+This document breaks down the k3s migration plan into small, actionable tasks. Each task corresponds to specific milestones from the implementation plan (30-plan.md).
 
-**Project Goal**: Migrate from Docker Compose (single-host) to Docker Swarm (multi-host) with distributed deployment.
+**Project Goal**: Migrate from Docker Compose (single-host) to k3s/Kubernetes cluster with cloud-native deployment patterns.
 
-**Timeline**: 15-21 days (3 weeks part-time)
-**Total Effort**: 58-72 hours
+**Timeline**: 11-16 days (2-3 weeks part-time)
+**Total Effort**: 42-55 hours
 
 ---
 
-## Phase 0: Prerequisites & Bug Fixes (Days 1-3)
+## Phase 0: Prerequisites & Preparation (Day 1)
 
-### Task 0.1: Fix Backend GET /api/names Response Format
+### Task 0.1: Verify Application is Fully Functional
 **Estimated Time**: 1 hour
-**Priority**: CRITICAL
+**Priority**: HIGH
 **Depends On**: None
 
-**Description**: Fix the response format to match frontend expectations
+**Description**: Verify current application works perfectly with Docker Compose before migration
+
+**Status**: ✅ COMPLETED - All bugs fixed in previous branch
 
 **Steps**:
-1. Open `src/backend/main.py`
-2. Locate the `list_names()` function (line ~136)
-3. Change `return jsonify(results)` to `return jsonify({"names": results}), 200`
-4. Test with Docker Compose: `cd src && docker-compose up`
-5. Verify names list displays in browser
-
-**Files to Modify**:
-- `src/backend/main.py`
+1. Start Docker Compose: `cd src && docker-compose up --build`
+2. Test all CRUD operations
+3. Verify health endpoints work
+4. Document current state
 
 **Acceptance Criteria**:
-- [ ] GET /api/names returns `{"names": [...]}`
-- [ ] Frontend displays names correctly
-- [ ] No errors in browser console
+- [x] GET /api/names returns `{"names": [...]}`
+- [x] Frontend displays names with timestamps
+- [x] DELETE works using ID parameter
+- [x] Health endpoints `/healthz` and `/api/health/db` working
+- [x] No errors in browser console
 
 **Testing**:
 ```bash
 cd src/
 docker-compose up --build
 # Open browser: http://localhost:8080
-# Add a name, verify it appears in list
-```
-
----
-
-### Task 0.2: Fix Frontend Display Logic
-**Estimated Time**: 1-2 hours
-**Priority**: CRITICAL
-**Depends On**: Task 0.1
-
-**Description**: Update frontend to properly handle response objects with timestamps
-
-**Steps**:
-1. Open `src/frontend/app.js`
-2. Locate `loadNames()` function (line ~117)
-3. Update to destructure response objects: `item.name`, `item.id`, `item.created_at`
-4. Add timestamp display in list items
-5. Test display with multiple names
-
-**Files to Modify**:
-- `src/frontend/app.js`
-
-**Code Changes**:
-```javascript
-// Change from:
-data.names.forEach((name) => {
-  li.innerHTML = `<span>${escapeHtml(name)}</span>...`
-})
-
-// Change to:
-data.names.forEach((item) => {
-  li.innerHTML = `
-    <div>
-      <span class="name">${escapeHtml(item.name)}</span>
-      <span class="meta">${new Date(item.created_at).toLocaleString()}</span>
-    </div>
-    <button onclick="deleteName(${item.id})" class="delete-btn">Delete</button>
-  `
-})
-```
-
-**Acceptance Criteria**:
-- [ ] Names display with proper formatting
-- [ ] Timestamps show in human-readable format
-- [ ] No `[object Object]` displayed
-
----
-
-### Task 0.3: Fix Frontend DELETE to Use ID
-**Estimated Time**: 1 hour
-**Priority**: CRITICAL
-**Depends On**: Task 0.2
-
-**Description**: Update delete function to use ID parameter instead of name string
-
-**Steps**:
-1. Open `src/frontend/app.js`
-2. Locate `deleteName()` function (line ~203)
-3. Change parameter from `nameToDelete` to `nameId`
-4. Update DELETE request to use `/names/${nameId}`
-5. Update confirmation dialog to get name from DOM
-
-**Files to Modify**:
-- `src/frontend/app.js`
-
-**Code Changes**:
-```javascript
-async function deleteName(nameId) {
-  try {
-    const nameElement = event.target.closest('li').querySelector('.name');
-    const nameText = nameElement.textContent;
-    
-    if (!confirm(`Are you sure you want to delete "${nameText}"?`)) {
-      return;
-    }
-    
-    const res = await apiRequest(`/names/${nameId}`, { 
-      method: "DELETE" 
-    });
-    
-    showSuccess(`Successfully deleted "${nameText}"`);
-    await loadNames();
-  } catch (error) {
-    // error handling...
-  }
-}
-```
-
-**Acceptance Criteria**:
-- [ ] Delete button passes ID parameter
-- [ ] DELETE request uses integer ID in path
-- [ ] Deletion works successfully
-- [ ] Confirmation shows correct name
-
----
-
-### Task 0.4: Fix Health Endpoint to Return {"status":"ok"}
-**Estimated Time**: 30 minutes
-**Priority**: HIGH
-**Depends On**: None
-
-**Description**: Fix health endpoint to return exact required format {"status":"ok"}
-
-**Current Issue**:
-- `/api/health` currently returns `{"status": "healthy", ...}` with extra fields
-- **REQUIRED**: Must return exactly `{"status":"ok"}` (or support `/healthz` alias)
-
-**Steps**:
-1. Open `src/backend/main.py`
-2. Locate `/api/health` endpoint (line ~183)
-3. Change response from `{"status": "healthy"}` to `{"status": "ok"}`
-4. Remove extra fields (version, timestamp, etc.)
-5. Optionally add `/healthz` alias endpoint
-6. Test both endpoints
-
-**Files to Modify**:
-- `src/backend/main.py`
-
-**Required Changes**:
-```python
-@app.route("/api/health", methods=["GET"])
-@app.route("/healthz", methods=["GET"])  # Optional alias
-def health_check():
-    """Basic health check endpoint."""
-    logger.info("Health check requested")
-    return jsonify({"status": "ok"}), 200
-```
-
-**Acceptance Criteria**:
-- [ ] GET /api/health returns exactly `{"status":"ok"}`
-- [ ] HTTP status code is 200
-- [ ] No extra fields in response
-- [ ] Optional: /healthz also works (alias)
-
-**Testing**:
-```bash
-curl http://localhost:8080/api/health
-# Expected: {"status":"ok"}
-
-# Optional:
+# Add names, verify display, test delete
 curl http://localhost:8080/healthz
-# Expected: {"status":"ok"}
+curl http://localhost:8080/api/health/db
 ```
 
 ---
 
-### Task 0.5: Update Backend to Use DATABASE_URL
+### Task 0.2: Install kubectl on Laptop
 **Estimated Time**: 30 minutes
 **Priority**: HIGH
 **Depends On**: None
 
-**Description**: Ensure backend reads database connection from DATABASE_URL environment variable
+**Description**: Install Kubernetes command-line tool for cluster management
 
 **Steps**:
-1. Open `src/backend/main.py`
-2. Check if `DB_URL` environment variable is read
-3. Add support for `DATABASE_URL` (Swarm stack will use this name)
-4. Update to prefer DATABASE_URL over DB_URL
+1. Check if kubectl installed: `kubectl version --client`
+2. Install kubectl if needed (macOS):
+   ```bash
+   brew install kubectl
+   ```
+3. Verify installation: `kubectl version --client`
+4. Check kubectl can run commands
 
-**Files to Modify**:
-- `src/backend/main.py`
+**Acceptance Criteria**:
+- [ ] kubectl installed (v1.28+)
+- [ ] `kubectl version --client` works
+- [ ] kubectl in PATH
 
-**Code Changes**:
-```python
-# Support both DB_URL (Compose) and DATABASE_URL (Swarm)
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL",
-    os.environ.get("DB_URL", "postgresql+psycopg2://names_user:names_pass@db:5432/namesdb")
-)
+**Alternative Installation Methods**:
+```bash
+# macOS - Homebrew
+brew install kubectl
 
-engine = create_engine(DATABASE_URL, echo=DB_ECHO, future=True)
+# macOS - Direct download
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/darwin/arm64/kubectl"
+chmod +x kubectl
+sudo mv kubectl /usr/local/bin/
+
+# Verify
+kubectl version --client
 ```
 
-**Acceptance Criteria**:
-- [ ] Reads DATABASE_URL environment variable
-- [ ] Falls back to DB_URL if DATABASE_URL not set
-- [ ] Works with Docker Compose (backward compatible)
-
 ---
 
-### Task 0.6: End-to-End Testing with Docker Compose
-**Estimated Time**: 1 hour
-**Priority**: CRITICAL
-**Depends On**: Tasks 0.1, 0.2, 0.3, 0.4, 0.5
-
-**Description**: Verify all bug fixes work together with Docker Compose
-
-**Steps**:
-1. Rebuild images: `cd src && docker-compose build`
-2. Start services: `docker-compose up`
-3. Test add name functionality
-4. Test view names with timestamps
-5. Test delete name functionality
-6. Test health endpoint
-7. Document any remaining issues
-
-**Acceptance Criteria**:
-- [ ] Can add names successfully
-- [ ] Names display with timestamps
-- [ ] Can delete names by ID
-- [ ] Health endpoint returns `{"status":"ok"}`
-- [ ] No console errors
-- [ ] All CRUD operations work
-
-**Testing Checklist**:
-- [ ] Add 3-5 names
-- [ ] Verify all appear with timestamps
-- [ ] Delete middle name
-- [ ] Refresh page, verify data persists
-- [ ] Check `/api/health` endpoint
-- [ ] Stop and restart services, verify data still there
-
----
-
-## Phase 1: Infrastructure Setup (Days 4-7)
-
-### Task 1.1: Install Vagrant and VirtualBox
-**Estimated Time**: 1 hour
+### Task 0.3: Verify Vagrant and VirtualBox
+**Estimated Time**: 15 minutes
 **Priority**: HIGH
-**Depends On**: Phase 0 complete
+**Depends On**: None
 
-**Description**: Set up prerequisites for VM management
+**Description**: Ensure VM prerequisites are installed and working
 
 **Steps**:
-1. Check if Vagrant installed: `vagrant --version`
-2. Check if VirtualBox installed: `VBoxManage --version`
-3. Install Vagrant if needed: https://www.vagrantup.com/downloads
-4. Install VirtualBox if needed: https://www.virtualbox.org/wiki/Downloads
-5. Verify both tools work together
+1. Check Vagrant: `vagrant --version`
+2. Check VirtualBox: `VBoxManage --version`
+3. If not installed, install from official websites
+4. Verify both work together
 
 **Acceptance Criteria**:
-- [x] Vagrant version 2.2+ installed (✅ v2.4.9)
-- [x] VirtualBox version 6.1+ installed (✅ v7.1.12)
-- [x] Can run `vagrant init` successfully
-- [x] VirtualBox GUI opens
+- [x] Vagrant 2.2+ installed (✅ Current: v2.4.9)
+- [x] VirtualBox 6.1+ installed (✅ Current: v7.1.12)
+- [x] Can run `vagrant status`
 
 **Testing**:
 ```bash
 vagrant --version
 VBoxManage --version
-vagrant init bento/ubuntu-22.04
 vagrant status
 ```
 
-**Note**: Using `bento/ubuntu-22.04` for ARM compatibility (Apple Silicon Macs).
+---
+
+### Task 0.4: Create k3s-orchestration Branch
+**Estimated Time**: 5 minutes
+**Priority**: HIGH
+**Depends On**: None
+
+**Description**: Create Git branch for k3s migration work
+
+**Steps**:
+1. Ensure current work is committed
+2. Create new branch: `git checkout -b k3s-orchestration`
+3. Verify on correct branch: `git branch`
+
+**Acceptance Criteria**:
+- [x] Branch `k3s-orchestration` created (✅ Current branch)
+- [x] All current work committed
+- [x] Ready to start k3s work
+
+**Commands**:
+```bash
+git status
+git add -A
+git commit -m "Prepare for k3s migration"
+git checkout -b k3s-orchestration
+git branch
+```
 
 ---
 
-### Task 1.2: Create Vagrantfile
-**Estimated Time**: 2 hours
+## Phase 1: k3s Infrastructure Setup (Days 2-4)
+
+### Task 1.1: Create or Update Vagrantfile for k3s
+**Estimated Time**: 1-2 hours
+**Priority**: HIGH
+**Depends On**: Phase 0 complete
+
+**Description**: Configure Vagrant VM for k3s-server (and optional k3s-agent)
+
+**Steps**:
+1. Open `Vagrantfile` in project root (or create if needed)
+2. Define k3s-server VM: Ubuntu 22.04, 2-4GB RAM, 2 CPU, IP 192.168.56.10
+3. Add provisioning script to install k3s automatically
+4. (Optional) Define k3s-agent VM for multi-node cluster
+5. Configure port forwarding if needed
+6. Test Vagrantfile syntax
+
+**Files to Create/Modify**:
+- `Vagrantfile`
+
+**Vagrantfile Configuration**:
+```ruby
+Vagrant.configure("2") do |config|
+  config.vm.box = "bento/ubuntu-22.04"
+  
+  # k3s Server (Control Plane)
+  config.vm.define "k3s-server" do |server|
+    server.vm.hostname = "k3s-server"
+    server.vm.network "private_network", ip: "192.168.56.10"
+    
+    server.vm.provider "virtualbox" do |vb|
+      vb.name = "k3s-server"
+      vb.memory = "2048"  # 2GB minimum, 4GB recommended
+      vb.cpus = 2
+    end
+    
+    # Install k3s
+    server.vm.provision "shell", inline: <<-SHELL
+      curl -sfL https://get.k3s.io | sh -
+      # Wait for k3s to be ready
+      sleep 10
+      sudo k3s kubectl get nodes
+    SHELL
+  end
+  
+  # Optional: k3s Agent (Worker Node)
+  # Uncomment if you want a multi-node cluster
+  # config.vm.define "k3s-agent" do |agent|
+  #   agent.vm.hostname = "k3s-agent"
+  #   agent.vm.network "private_network", ip: "192.168.56.11"
+  #   
+  #   agent.vm.provider "virtualbox" do |vb|
+  #     vb.name = "k3s-agent"
+  #     vb.memory = "2048"
+  #     vb.cpus = 2
+  #   end
+  # end
+end
+```
+
+**Acceptance Criteria**:
+- [ ] Vagrantfile created/updated with k3s-server definition
+- [ ] VM configured with 2-4GB RAM, 2 CPUs
+- [ ] Private network IP: 192.168.56.10
+- [ ] k3s auto-install provisioning script included
+- [ ] Vagrantfile syntax valid
+
+**Testing**:
+```bash
+vagrant validate
+# Should return: Vagrantfile validated successfully
+```
+
+---
+
+### Task 1.2: Start k3s-server VM and Verify Installation
+**Estimated Time**: 1 hour
 **Priority**: HIGH
 **Depends On**: Task 1.1
 
-**Description**: Define two VMs (manager and worker) with proper configuration
+**Description**: Launch k3s-server VM and verify k3s is running
 
 **Steps**:
-1. Create `Vagrantfile` in project root
-2. Define manager VM: Ubuntu 22.04, 2GB RAM, 2 CPU, IP 192.168.56.10
-3. Define worker VM: Ubuntu 22.04, 2GB RAM, 2 CPU, IP 192.168.56.11
+1. Start VM: `vagrant up k3s-server`
+2. Wait for provisioning to complete (k3s installation)
+3. SSH into VM: `vagrant ssh k3s-server`
+4. Check k3s status: `sudo systemctl status k3s`
+5. Verify node is ready: `sudo k3s kubectl get nodes`
+6. Exit VM
+
+**Acceptance Criteria**:
+- [ ] VM starts successfully
+- [ ] k3s service running
+- [ ] Node shows Ready status
+- [ ] Can run `sudo k3s kubectl` commands
+- [ ] No error messages in k3s logs
+
+**Commands**:
+```bash
+# Start VM
+vagrant up k3s-server
+
+# SSH into VM
+vagrant ssh k3s-server
+
+# Inside VM - Check k3s
+sudo systemctl status k3s
+sudo k3s kubectl get nodes
+sudo k3s kubectl cluster-info
+
+# Check k3s version
+sudo k3s --version
+
+# Exit
+exit
+```
+
+**Troubleshooting**:
+```bash
+# If k3s not running
+sudo systemctl start k3s
+sudo journalctl -u k3s -f
+
+# If node not Ready
+sudo k3s kubectl describe node k3s-server
+```
+
+---
+
+### Task 1.3: Configure kubectl Access from Laptop
+**Estimated Time**: 1 hour
+**Priority**: HIGH
+**Depends On**: Task 1.2
+
+**Description**: Set up kubectl on laptop to manage k3s cluster remotely
+
+**Steps**:
+1. Copy kubeconfig from k3s-server to laptop
+2. Update server IP from 127.0.0.1 to VM IP (192.168.56.10)
+3. Set KUBECONFIG environment variable or merge into ~/.kube/config
+4. Test kubectl connection from laptop
+5. Verify can manage cluster without SSH
+
+**Commands**:
+```bash
+# Get kubeconfig from VM
+vagrant ssh k3s-server -- sudo cat /etc/rancher/k3s/k3s.yaml > k3s-config.yaml
+
+# Update server IP in k3s-config.yaml
+# Change: server: https://127.0.0.1:6443
+# To:     server: https://192.168.56.10:6443
+sed -i '' 's/127.0.0.1/192.168.56.10/g' k3s-config.yaml
+
+# Set KUBECONFIG
+export KUBECONFIG=$(pwd)/k3s-config.yaml
+
+# Or merge into default kubeconfig
+mkdir -p ~/.kube
+cp k3s-config.yaml ~/.kube/config
+chmod 600 ~/.kube/config
+
+# Test connection
+kubectl cluster-info
+kubectl get nodes
+kubectl get pods --all-namespaces
+```
+
+**Acceptance Criteria**:
+- [ ] Kubeconfig copied from k3s-server
+- [ ] Server IP updated to 192.168.56.10
+- [ ] kubectl can connect from laptop
+- [ ] `kubectl get nodes` shows k3s-server as Ready
+- [ ] `kubectl cluster-info` returns cluster details
+- [ ] No certificate errors
+
+**Troubleshooting**:
+```bash
+# If connection fails
+kubectl cluster-info
+kubectl config view
+kubectl config get-contexts
+
+# Check VM firewall
+vagrant ssh k3s-server -- sudo ufw status
+
+# Verify k3s API server listening
+vagrant ssh k3s-server -- sudo ss -tlnp | grep 6443
+```
+
+---
+
+### Task 1.4: (Optional) Add k3s Agent Node
+**Estimated Time**: 1 hour
+**Priority**: MEDIUM
+**Depends On**: Task 1.3
+
+**Description**: Add worker node to create multi-node k3s cluster
+
+**Note**: This task is optional. Single-node k3s is sufficient for the project.
+
+**Steps**:
+1. Get node token from k3s-server
+2. Save token securely
+3. Uncomment k3s-agent definition in Vagrantfile
+4. Start agent VM: `vagrant up k3s-agent`
+5. SSH into agent and join cluster
+6. Verify from laptop: `kubectl get nodes`
+
+**Commands**:
+```bash
+# Get node token from server
+vagrant ssh k3s-server -- sudo cat /var/lib/rancher/k3s/server/node-token
+
+# Save token (example: K10xxx...::server:xxx)
+K3S_TOKEN="<TOKEN_FROM_ABOVE>"
+
+# Start agent VM
+vagrant up k3s-agent
+
+# SSH into agent
+vagrant ssh k3s-agent
+
+# Inside agent VM - Install k3s agent
+K3S_URL="https://192.168.56.10:6443"
+curl -sfL https://get.k3s.io | K3S_URL=$K3S_URL K3S_TOKEN=$K3S_TOKEN sh -
+
+# Exit agent
+exit
+
+# Verify from laptop
+kubectl get nodes
+# Should show both k3s-server and k3s-agent
+```
+
+**Acceptance Criteria**:
+- [ ] k3s-agent VM running
+- [ ] Agent joined cluster successfully
+- [ ] `kubectl get nodes` shows both nodes
+- [ ] Both nodes in Ready state
+- [ ] Pods can be scheduled on agent
+
+**Note**: If skipping this task, continue with single-node cluster.
 4. Configure port forwarding: 80:8080 on manager
 5. Set up provisioning script path
 
@@ -579,145 +661,730 @@ docker network ls | grep appnet
 
 ---
 
-## Phase 2: Docker Stack Configuration (Days 8-11)
+## Phase 2: Kubernetes Manifests Creation (Days 5-8)
 
-### Task 2.1: Create swarm Directory
+### Task 2.1: Create k8s Directory Structure
 **Estimated Time**: 5 minutes
 **Priority**: HIGH
 **Depends On**: Phase 1 complete
 
-**Description**: Create directory for Swarm stack file
+**Description**: Create directory for Kubernetes manifests
 
 **Steps**:
-1. Create directory: `mkdir -p swarm`
+1. Create directory: `mkdir -p k8s`
 2. Verify directory exists
 3. Document purpose in README
 
 **Files to Create**:
-- `swarm/` directory
+- `k8s/` directory
 
 **Acceptance Criteria**:
-- [x] `swarm/` directory exists at project root (✅ created)
-- [x] Directory structure documented (✅ swarm/README.md created)
+- [ ] `k8s/` directory exists at project root
+- [ ] Directory ready for manifest files
+
+**Commands**:
+```bash
+mkdir -p k8s
+ls -la k8s/
+```
 
 ---
 
-### Task 2.2: Create stack.yaml File
-**Estimated Time**: 3-4 hours
-**Priority**: CRITICAL
+### Task 2.2: Create Namespace Manifest
+**Estimated Time**: 15 minutes
+**Priority**: HIGH
 **Depends On**: Task 2.1
 
-**Description**: Create Docker Swarm stack configuration file (REQUIRED name and location)
+**Description**: Create namespace for isolating application resources
 
 **Steps**:
-1. Create `swarm/stack.yaml`
-2. Define `db` service with PostgreSQL configuration
-3. Define `api` service with backend configuration
-4. Define `web` service with frontend configuration
-5. Configure `appnet` overlay network
-6. Configure `dbdata` volume
-7. Add all required placement constraints and health checks
+1. Create `k8s/namespace.yaml`
+2. Define namespace `names-app`
+3. Add descriptive labels
+4. Test with dry-run
 
 **Files to Create**:
-- `swarm/stack.yaml` (EXACT path required)
+- `k8s/namespace.yaml`
 
-**Complete File Content**:
+**File Content**:
 ```yaml
-version: "3.8"
-
-services:
-  db:
-    image: postgres:15
-    environment:
-      POSTGRES_USER: names_user
-      POSTGRES_PASSWORD: names_pass
-      POSTGRES_DB: namesdb
-    volumes:
-      - dbdata:/var/lib/postgresql/data
-    networks:
-      - appnet
-    deploy:
-      replicas: 1
-      placement:
-        constraints:
-          - node.labels.role == db
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U names_user -d namesdb"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
-
-  api:
-    image: localhost/names-backend:latest
-    environment:
-      DATABASE_URL: postgresql+psycopg2://names_user:names_pass@db:5432/namesdb
-      MAX_NAME_LENGTH: 50
-      SERVER_HOST: 0.0.0.0
-      SERVER_PORT: 8000
-      LOG_LEVEL: INFO
-      DB_ECHO: false
-    networks:
-      - appnet
-    deploy:
-      replicas: 2
-      placement:
-        constraints:
-          - node.role == manager
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
-      update_config:
-        parallelism: 1
-        delay: 10s
-        failure_action: rollback
-      rollback_config:
-        parallelism: 1
-        delay: 10s
-    depends_on:
-      - db
-
-  web:
-    image: localhost/names-frontend:latest
-    ports:
-      - "80:80"
-    networks:
-      - appnet
-    deploy:
-      replicas: 1
-      placement:
-        constraints:
-          - node.role == manager
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
-      update_config:
-        parallelism: 1
-        delay: 10s
-    depends_on:
-      - api
-
-networks:
-  appnet:
-    driver: overlay
-
-volumes:
-  dbdata:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /var/lib/postgres-data
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: names-app
+  labels:
+    app: names-manager
+    environment: production
 ```
 
 **Acceptance Criteria**:
-- [x] File at exact path: `swarm/stack.yaml` (✅ created)
+- [ ] File `k8s/namespace.yaml` created
+- [ ] Namespace named `names-app`
+- [ ] Labels included
+- [ ] Valid YAML syntax
+
+**Testing**:
+```bash
+kubectl apply -f k8s/namespace.yaml --dry-run=client
+# Should return: namespace/names-app created (dry run)
+```
+
+---
+
+### Task 2.3: Create ConfigMap Manifest
+**Estimated Time**: 30 minutes
+**Priority**: HIGH
+**Depends On**: Task 2.2
+
+**Description**: Create ConfigMap for application configuration
+
+**Steps**:
+1. Create `k8s/configmap.yaml`
+2. Add all application configuration values
+3. Include database connection parameters (non-sensitive)
+4. Test with dry-run
+
+**Files to Create**:
+- `k8s/configmap.yaml`
+
+**File Content**:
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: names-app-config
+  namespace: names-app
+data:
+  MAX_NAME_LENGTH: "50"
+  SERVER_HOST: "0.0.0.0"
+  SERVER_PORT: "8000"
+  LOG_LEVEL: "INFO"
+  DB_ECHO: "false"
+  DB_HOST: "db-service"
+  DB_PORT: "5432"
+  DB_NAME: "namesdb"
+```
+
+**Acceptance Criteria**:
+- [ ] File `k8s/configmap.yaml` created
+- [ ] ConfigMap named `names-app-config`
+- [ ] All configuration keys defined
+- [ ] Values in string format
+- [ ] Valid YAML syntax
+
+**Testing**:
+```bash
+kubectl apply -f k8s/configmap.yaml --dry-run=client -n names-app
+```
+
+---
+
+### Task 2.4: Create Secret Manifest
+**Estimated Time**: 30 minutes
+**Priority**: HIGH
+**Depends On**: Task 2.3
+
+**Description**: Create Secret for database credentials
+
+**Steps**:
+1. Create `k8s/secret.yaml`
+2. Add database credentials
+3. Use `stringData` for readable values (Kubernetes will encode)
+4. Test with dry-run
+
+**Files to Create**:
+- `k8s/secret.yaml`
+
+**File Content**:
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-credentials
+  namespace: names-app
+type: Opaque
+stringData:
+  POSTGRES_USER: names_user
+  POSTGRES_PASSWORD: names_pass
+  POSTGRES_DB: namesdb
+```
+
+**Acceptance Criteria**:
+- [ ] File `k8s/secret.yaml` created
+- [ ] Secret named `db-credentials`
+- [ ] All database credentials included
+- [ ] Uses `stringData` (not base64 encoded)
+- [ ] Valid YAML syntax
+
+**Testing**:
+```bash
+kubectl apply -f k8s/secret.yaml --dry-run=client -n names-app
+```
+
+**Security Note**: Don't commit secrets to Git in production. Use external secret management.
+
+---
+
+### Task 2.5: Create Database PersistentVolumeClaim
+**Estimated Time**: 30 minutes
+**Priority**: HIGH
+**Depends On**: Task 2.4
+
+**Description**: Create PVC for PostgreSQL persistent storage
+
+**Steps**:
+1. Create `k8s/database-pvc.yaml`
+2. Request 1Gi storage (adjust based on needs)
+3. Use default storage class (k3s local-path-provisioner)
+4. Test with dry-run
+
+**Files to Create**:
+- `k8s/database-pvc.yaml`
+
+**File Content**:
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: names-app
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  # storageClassName: local-path  # k3s default, can be omitted
+```
+
+**Acceptance Criteria**:
+- [ ] File `k8s/database-pvc.yaml` created
+- [ ] PVC named `postgres-pvc`
+- [ ] Storage size: 1Gi (or appropriate size)
+- [ ] Access mode: ReadWriteOnce
+- [ ] Valid YAML syntax
+
+**Testing**:
+```bash
+kubectl apply -f k8s/database-pvc.yaml --dry-run=client -n names-app
+```
+
+---
+
+### Task 2.6: Create Database StatefulSet
+**Estimated Time**: 1-2 hours
+**Priority**: CRITICAL
+**Depends On**: Task 2.5
+
+**Description**: Create StatefulSet for PostgreSQL database
+
+**Steps**:
+1. Create `k8s/database-statefulset.yaml`
+2. Configure to use postgres:15 image
+3. Mount PVC to /var/lib/postgresql/data
+4. Reference Secret for credentials
+5. Add liveness and readiness probes
+6. Test with dry-run
+
+**Files to Create**:
+- `k8s/database-statefulset.yaml`
+
+**File Content**:
+```yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: names-app
+spec:
+  serviceName: db-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15
+        ports:
+        - containerPort: 5432
+          name: postgres
+        envFrom:
+        - secretRef:
+            name: db-credentials
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - names_user
+            - -d
+            - namesdb
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - names_user
+            - -d
+            - namesdb
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: postgres-pvc
+```
+
+**Acceptance Criteria**:
+- [ ] File `k8s/database-statefulset.yaml` created
+- [ ] StatefulSet named `postgres`
+- [ ] Uses postgres:15 image
+- [ ] Mounts PVC correctly
+- [ ] Loads credentials from Secret
+- [ ] Health probes configured
+- [ ] Valid YAML syntax
+
+**Testing**:
+```bash
+kubectl apply -f k8s/database-statefulset.yaml --dry-run=client -n names-app
+```
+
+---
+
+### Task 2.7: Create Database Service
+**Estimated Time**: 15 minutes
+**Priority**: HIGH
+**Depends On**: Task 2.6
+
+**Description**: Create ClusterIP Service for database access
+
+**Steps**:
+1. Create `k8s/database-service.yaml`
+2. Define service named `db-service`
+3. Expose port 5432
+4. Select postgres pods
+5. Test with dry-run
+
+**Files to Create**:
+- `k8s/database-service.yaml`
+
+**File Content**:
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-service
+  namespace: names-app
+spec:
+  type: ClusterIP
+  selector:
+    app: postgres
+  ports:
+  - name: postgres
+    protocol: TCP
+    port: 5432
+    targetPort: 5432
+```
+
+**Acceptance Criteria**:
+- [ ] File `k8s/database-service.yaml` created
+- [ ] Service named `db-service`
+- [ ] Type: ClusterIP (internal only)
+- [ ] Port 5432 exposed
+- [ ] Selects postgres pods
+- [ ] Valid YAML syntax
+
+**Testing**:
+```bash
+kubectl apply -f k8s/database-service.yaml --dry-run=client -n names-app
+```
+
+---
+
+### Task 2.8: Create Backend Deployment
+**Estimated Time**: 1-2 hours
+**Priority**: CRITICAL
+**Depends On**: Task 2.7
+
+**Description**: Create Deployment for Flask backend API
+
+**Steps**:
+1. Create `k8s/backend-deployment.yaml`
+2. Configure 2 replicas for high availability
+3. Set environment variables from ConfigMap and Secret
+4. Build DATABASE_URL from Secret values
+5. Add liveness and readiness probes
+6. Set `imagePullPolicy: Never` for local images
+7. Test with dry-run
+
+**Files to Create**:
+- `k8s/backend-deployment.yaml`
+
+**File Content**:
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: names-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+      - name: backend
+        image: names-backend:latest
+        imagePullPolicy: Never  # Use local image, don't pull
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        # Database connection built from ConfigMap and Secret
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: POSTGRES_USER
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: POSTGRES_PASSWORD
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: POSTGRES_DB
+        - name: DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: names-app-config
+              key: DB_HOST
+        - name: DB_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: names-app-config
+              key: DB_PORT
+        - name: DATABASE_URL
+          value: "postgresql+psycopg2://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)"
+        - name: MAX_NAME_LENGTH
+          valueFrom:
+            configMapKeyRef:
+              name: names-app-config
+              key: MAX_NAME_LENGTH
+        - name: SERVER_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: names-app-config
+              key: SERVER_HOST
+        - name: SERVER_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: names-app-config
+              key: SERVER_PORT
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: names-app-config
+              key: LOG_LEVEL
+        - name: DB_ECHO
+          valueFrom:
+            configMapKeyRef:
+              name: names-app-config
+              key: DB_ECHO
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/health/db
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+```
+
+**Acceptance Criteria**:
+- [ ] File `k8s/backend-deployment.yaml` created
+- [ ] Deployment named `backend`
+- [ ] 2 replicas configured
+- [ ] Uses `names-backend:latest` with imagePullPolicy: Never
+- [ ] All environment variables from ConfigMap/Secret
+- [ ] DATABASE_URL properly constructed
+- [ ] Health probes configured
+- [ ] Resource requests/limits set
+- [ ] Valid YAML syntax
+
+**Testing**:
+```bash
+kubectl apply -f k8s/backend-deployment.yaml --dry-run=client -n names-app
+```
+
+---
+
+### Task 2.9: Create Backend Service
+**Estimated Time**: 15 minutes
+**Priority**: HIGH
+**Depends On**: Task 2.8
+
+**Description**: Create ClusterIP Service for backend API access
+
+**Steps**:
+1. Create `k8s/backend-service.yaml`
+2. Define service named `api-service`
+3. Expose port 5000 (mapping to container port 8000)
+4. Select backend pods
+5. Test with dry-run
+
+**Files to Create**:
+- `k8s/backend-service.yaml`
+
+**File Content**:
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-service
+  namespace: names-app
+spec:
+  type: ClusterIP
+  selector:
+    app: backend
+  ports:
+  - name: http
+    protocol: TCP
+    port: 5000
+    targetPort: 8000
+```
+
+**Acceptance Criteria**:
+- [ ] File `k8s/backend-service.yaml` created
+- [ ] Service named `api-service`
+- [ ] Type: ClusterIP (internal only)
+- [ ] Port 5000 exposed, targets container port 8000
+- [ ] Selects backend pods
+- [ ] Valid YAML syntax
+
+**Testing**:
+```bash
+kubectl apply -f k8s/backend-service.yaml --dry-run=client -n names-app
+```
+
+---
+
+### Task 2.10: Create Frontend Deployment
+**Estimated Time**: 1 hour
+**Priority**: CRITICAL
+**Depends On**: Task 2.9
+
+**Description**: Create Deployment for Nginx frontend
+
+**Steps**:
+1. Create `k8s/frontend-deployment.yaml`
+2. Configure 1 replica
+3. Use `names-frontend:latest` image
+4. Set `imagePullPolicy: Never`
+5. Configure environment for API access
+6. Test with dry-run
+
+**Files to Create**:
+- `k8s/frontend-deployment.yaml`
+
+**File Content**:
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: names-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: names-frontend:latest
+        imagePullPolicy: Never  # Use local image, don't pull
+        ports:
+        - containerPort: 80
+          name: http
+        env:
+        - name: API_URL
+          value: "http://api-service:5000"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+```
+
+**Acceptance Criteria**:
+- [ ] File `k8s/frontend-deployment.yaml` created
+- [ ] Deployment named `frontend`
+- [ ] 1 replica configured
+- [ ] Uses `names-frontend:latest` with imagePullPolicy: Never
+- [ ] API_URL points to api-service
+- [ ] Resource requests/limits set
+- [ ] Valid YAML syntax
+
+**Testing**:
+```bash
+kubectl apply -f k8s/frontend-deployment.yaml --dry-run=client -n names-app
+```
+
+---
+
+### Task 2.11: Create Frontend Service (NodePort)
+**Estimated Time**: 30 minutes
+**Priority**: CRITICAL
+**Depends On**: Task 2.10
+
+**Description**: Create NodePort Service for external frontend access
+
+**Steps**:
+1. Create `k8s/frontend-service.yaml`
+2. Define service named `frontend-service`
+3. Type: NodePort for external access
+4. Expose port 80, let Kubernetes assign NodePort
+5. Select frontend pods
+6. Test with dry-run
+
+**Files to Create**:
+- `k8s/frontend-service.yaml`
+
+**File Content**:
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  namespace: names-app
+spec:
+  type: NodePort
+  selector:
+    app: frontend
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: 80
+    # nodePort: 30080  # Optional: specify NodePort, or let k8s assign
+```
+
+**Acceptance Criteria**:
+- [ ] File `k8s/frontend-service.yaml` created
+- [ ] Service named `frontend-service`
+- [ ] Type: NodePort (external access)
+- [ ] Port 80 exposed
+- [ ] NodePort in range 30000-32767 (auto-assigned or specified)
+- [ ] Selects frontend pods
+- [ ] Valid YAML syntax
+
+**Testing**:
+```bash
+kubectl apply -f k8s/frontend-service.yaml --dry-run=client -n names-app
+```
+
+---
+
+### Task 2.12: Verify All Manifests with Dry-Run
+**Estimated Time**: 30 minutes
+**Priority**: HIGH
+**Depends On**: All Phase 2 tasks
+
+**Description**: Validate all Kubernetes manifests before deployment
+
+**Steps**:
+1. Run dry-run on all manifests
+2. Check for syntax errors
+3. Verify resource names are consistent
+4. Check label selectors match
+5. Document any issues found
+
+**Acceptance Criteria**:
+- [ ] All manifests pass dry-run validation
+- [ ] No YAML syntax errors
+- [ ] Label selectors match deployments/services
+- [ ] Namespace consistent across all resources
+- [ ] imagePullPolicy: Never set for local images
+
+**Testing Commands**:
+```bash
+# Validate all manifests
+kubectl apply -f k8s/ --dry-run=client -n names-app
+
+# Or validate individually
+for file in k8s/*.yaml; do
+  echo "Validating $file..."
+  kubectl apply -f "$file" --dry-run=client
+done
+```
+
+**Checklist**:
+- [ ] namespace.yaml validates
+- [ ] configmap.yaml validates
+- [ ] secret.yaml validates
+- [ ] database-pvc.yaml validates
+- [ ] database-statefulset.yaml validates
+- [ ] database-service.yaml validates
+- [ ] backend-deployment.yaml validates
+- [ ] backend-service.yaml validates
+- [ ] frontend-deployment.yaml validates
+- [ ] frontend-service.yaml validates
+
+---
+
+## Phase 3: Container Image Management (Days 9-10)
+
+### Task 3.1: Build Container Images
+**Estimated Time**: 30 minutes
+**Priority**: HIGH
+**Depends On**: Phase 2 complete
+
+**Description**: Build backend and frontend Docker images
+
+**Note**: Application code is already functional from previous work
 - [x] Network `appnet` with `external: true` (✅ uses pre-created overlay network)
 - [x] Volume `dbdata` bound to `/var/lib/postgres-data` (✅ configured)
 - [x] DB service: `node.labels.role == db` constraint (✅ placed on worker)
@@ -761,126 +1428,468 @@ docker stack config -c /vagrant/swarm/stack.yaml
 
 ---
 
-## Phase 3: Image Building & Distribution (Days 12-14)
-
-### Task 3.1: Create Build Script
-**Estimated Time**: 1 hour
-**Priority**: HIGH
-**Depends On**: Phase 2 complete
-
-**Description**: Automated script to build Docker images with bug fixes
-
-**Steps**:
-1. Create `src/build-images.sh`
-2. Add commands to build backend image
-3. Add commands to build frontend image
-4. Add image tagging
-5. Make script executable
-
-**Files to Create**:
-- `src/build-images.sh`
-
-**Script Content**:
-```bash
-#!/bin/bash
-set -e
-
-echo "=== Building Names Manager Docker Images ==="
-
-# Build backend
-echo "Building backend image..."
-cd backend
-docker build -t localhost/names-backend:latest .
-cd ..
-
-# Build frontend
-echo "Building frontend image..."
-cd frontend
-docker build -t localhost/names-frontend:latest .
-cd ..
-
-echo "=== Build Complete ==="
-docker images | grep names
-
-echo ""
-echo "Images ready for deployment!"
-```
-
-**Acceptance Criteria**:
-- [x] Script is executable (`chmod +x`) (✅ -rwxr-xr-x)
-- [x] Builds backend image successfully (✅ localhost/names-backend:latest 708MB)
-- [x] Builds frontend image successfully (✅ localhost/names-frontend:latest 81MB)
-- [x] Images tagged correctly (✅ both tagged with localhost/names-*:latest)
-- [x] Script shows success message (✅ "Images ready for deployment!")
-
----
-
-### Task 3.2: Build Images Locally
+### Task 3.2: Build Backend and Frontend Images
 **Estimated Time**: 30 minutes
 **Priority**: HIGH
 **Depends On**: Task 3.1
 
-**Description**: Run build script to create images with all bug fixes
+**Description**: Build Docker images for backend and frontend
+
+**Note**: Images already built and tested with Docker Compose. Rebuild if needed.
 
 **Steps**:
-1. Ensure bug fixes from Phase 0 are in code
-2. Navigate to src directory
-3. Run: `./build-images.sh`
-4. Verify images created: `docker images | grep names`
-5. Test images with Docker Compose
+1. Navigate to src directory
+2. Build backend: `docker build -t names-backend:latest backend/`
+3. Build frontend: `docker build -t names-frontend:latest frontend/`
+4. Verify images created
 
-**Acceptance Criteria**:
-- [x] Backend image contains fixed code (✅ verified with API tests)
-- [x] Frontend image contains fixed code (✅ verified with Docker Compose)
-- [x] Both images build without errors (✅ build script completed successfully)
-- [x] Images visible in `docker images` (✅ localhost/names-backend:latest 708MB, localhost/names-frontend:latest 81MB)
-
-**Testing**:
+**Commands**:
 ```bash
 cd src/
-./build-images.sh
+
+# Build backend
+docker build -t names-backend:latest backend/
+
+# Build frontend
+docker build -t names-frontend:latest frontend/
+
+# Verify
 docker images | grep names
-# Should show:
-# localhost/names-backend    latest
-# localhost/names-frontend   latest
+```
+
+**Acceptance Criteria**:
+- [ ] Backend image builds successfully
+- [ ] Frontend image builds successfully
+- [ ] Images tagged as `names-backend:latest` and `names-frontend:latest`
+- [ ] No build errors
+
+---
+
+### Task 3.3: Save Images to TAR Archives
+**Estimated Time**: 15 minutes
+**Priority**: HIGH
+**Depends On**: Task 3.2
+
+**Description**: Export Docker images to tar files for transfer to k3s VM
+
+**Steps**:
+1. Save backend image to tar: `docker save names-backend:latest > names-backend.tar`
+2. Save frontend image to tar: `docker save names-frontend:latest > names-frontend.tar`
+3. Verify tar files created
+4. Check file sizes
+
+**Commands**:
+```bash
+cd src/
+
+# Save images
+docker save names-backend:latest > names-backend.tar
+docker save names-frontend:latest > names-frontend.tar
+
+# Check files
+ls -lh names-*.tar
+```
+
+**Acceptance Criteria**:
+- [ ] `names-backend.tar` created
+- [ ] `names-frontend.tar` created
+- [ ] Files are non-zero size
+- [ ] Ready for transfer to VM
+
+**Expected Sizes** (approximate):
+- Backend: 700-800 MB
+- Frontend: 50-80 MB
+
+---
+
+### Task 3.4: Transfer Images to k3s-server VM
+**Estimated Time**: 30 minutes
+**Priority**: HIGH
+**Depends On**: Task 3.3
+
+**Description**: Copy tar files to k3s-server VM
+
+**Steps**:
+1. Get VM SSH port: `vagrant port k3s-server`
+2. Transfer backend tar via SCP
+3. Transfer frontend tar via SCP
+4. Verify files on VM
+
+**Commands**:
+```bash
+# From project root
+cd src/
+
+# Transfer to VM
+scp -P $(vagrant port k3s-server --guest 22) \
+  names-backend.tar names-frontend.tar \
+  vagrant@localhost:/tmp/
+
+# Verify on VM
+vagrant ssh k3s-server -- ls -lh /tmp/names-*.tar
+```
+
+**Acceptance Criteria**:
+- [ ] Both tar files transferred successfully
+- [ ] Files exist in `/tmp/` on k3s-server
+- [ ] File sizes match originals
+- [ ] Ready for import to containerd
+
+---
+
+### Task 3.5: Import Images into k3s Containerd
+**Estimated Time**: 30 minutes
+**Priority**: CRITICAL
+**Depends On**: Task 3.4
+
+**Description**: Import Docker images into k3s containerd runtime
+
+**Steps**:
+1. SSH into k3s-server
+2. Import backend image using `k3s ctr`
+3. Import frontend image using `k3s ctr`
+4. Verify images with `crictl`
+5. Clean up tar files
+
+**Commands**:
+```bash
+# SSH into VM
+vagrant ssh k3s-server
+
+# Import images to containerd
+sudo k3s ctr images import /tmp/names-backend.tar
+sudo k3s ctr images import /tmp/names-frontend.tar
+
+# Verify with crictl (Kubernetes CRI tool)
+sudo crictl images | grep names
+
+# Alternative: Import with ctr in k8s.io namespace
+sudo ctr -n k8s.io images import /tmp/names-backend.tar
+sudo ctr -n k8s.io images import /tmp/names-frontend.tar
+
+# List images
+sudo ctr -n k8s.io images ls | grep names
+
+# Clean up
+rm /tmp/names-backend.tar /tmp/names-frontend.tar
+
+# Exit VM
+exit
+```
+
+**Acceptance Criteria**:
+- [ ] Backend image imported successfully
+- [ ] Frontend image imported successfully
+- [ ] `crictl images` shows both images
+- [ ] Images in containerd k8s.io namespace
+- [ ] No import errors in logs
+
+**Expected Output**:
+```
+$ sudo crictl images | grep names
+docker.io/library/names-backend    latest    <id>    700MB
+docker.io/library/names-frontend   latest    <id>    50MB
+```
+
+**Troubleshooting**:
+```bash
+# If images not showing
+sudo systemctl status containerd
+sudo journalctl -u k3s -f
+
+# Check k3s containerd config
+sudo k3s crictl images
 ```
 
 ---
 
-### Task 3.3: Transfer Images to Manager VM
-**Estimated Time**: 1 hour
-**Priority**: HIGH
-**Depends On**: Task 3.2
+## Phase 4: k3s Deployment & Testing (Days 11-13)
 
-**Description**: Copy built images to manager VM for Swarm deployment
+### Task 4.1: Apply Namespace and Configuration
+**Estimated Time**: 30 minutes
+**Priority**: HIGH
+**Depends On**: Phase 3 complete
+
+**Description**: Deploy namespace, ConfigMap, and Secret to k3s cluster
 
 **Steps**:
-1. Save backend image: `docker save localhost/names-backend:latest | gzip > names-backend.tar.gz`
-2. Save frontend image: `docker save localhost/names-frontend:latest | gzip > names-frontend.tar.gz`
-3. Transfer to manager VM
-4. Load images on manager VM
-5. Verify images available
-
-**Acceptance Criteria**:
-- [x] Images saved to tar.gz files (✅ backend: 155MB, frontend: 22MB compressed)
-- [x] Files transferred to manager VM (✅ SCP via port 2222 successful)
-- [x] Images loaded successfully (✅ gunzip | docker load completed)
-- [x] `docker images` shows both images on manager (✅ backend: 507MB, frontend: 53.4MB on manager)
+1. Apply namespace: `kubectl apply -f k8s/namespace.yaml`
+2. Apply ConfigMap: `kubectl apply -f k8s/configmap.yaml`
+3. Apply Secret: `kubectl apply -f k8s/secret.yaml`
+4. Verify resources created
+5. Check for any errors
 
 **Commands**:
 ```bash
-# On laptop - save images
-cd src/
-docker save localhost/names-backend:latest | gzip > names-backend.tar.gz
-docker save localhost/names-frontend:latest | gzip > names-frontend.tar.gz
+# Apply base resources
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/secret.yaml
 
-# Transfer to manager
-scp -P $(vagrant port manager --guest 22) \
-  names-backend.tar.gz names-frontend.tar.gz \
-  vagrant@localhost:/home/vagrant/
+# Verify
+kubectl get namespace names-app
+kubectl get configmap -n names-app
+kubectl get secret -n names-app
 
-# On manager VM - load images
-vagrant ssh manager
+# Describe to verify content
+kubectl describe configmap names-app-config -n names-app
+kubectl describe secret db-credentials -n names-app
+```
+
+**Acceptance Criteria**:
+- [ ] Namespace `names-app` created (Active status)
+- [ ] ConfigMap `names-app-config` created
+- [ ] Secret `db-credentials` created
+- [ ] All resources in names-app namespace
+- [ ] No error messages
+
+---
+
+### Task 4.2: Deploy Database (PVC, StatefulSet, Service)
+**Estimated Time**: 1 hour
+**Priority**: CRITICAL
+**Depends On**: Task 4.1
+
+**Description**: Deploy PostgreSQL database with persistent storage
+
+**Steps**:
+1. Apply PVC: `kubectl apply -f k8s/database-pvc.yaml`
+2. Wait for PVC to bind
+3. Apply StatefulSet: `kubectl apply -f k8s/database-statefulset.yaml`
+4. Apply Service: `kubectl apply -f k8s/database-service.yaml`
+5. Wait for pod to be ready
+6. Check logs for errors
+
+**Commands**:
+```bash
+# Apply database resources
+kubectl apply -f k8s/database-pvc.yaml
+kubectl apply -f k8s/database-statefulset.yaml
+kubectl apply -f k8s/database-service.yaml
+
+# Check PVC status
+kubectl get pvc -n names-app
+# Should show: postgres-pvc   Bound
+
+# Wait for database pod
+kubectl wait --for=condition=ready pod/postgres-0 -n names-app --timeout=300s
+
+# Check status
+kubectl get statefulset -n names-app
+kubectl get pods -n names-app
+kubectl get svc -n names-app
+
+# Check database logs
+kubectl logs postgres-0 -n names-app --tail=50
+
+# Verify health probes
+kubectl describe pod postgres-0 -n names-app | grep -A 10 "Liveness\|Readiness"
+```
+
+**Acceptance Criteria**:
+- [ ] PVC `postgres-pvc` is Bound
+- [ ] StatefulSet `postgres` shows 1/1 replicas ready
+- [ ] Pod `postgres-0` in Running status
+- [ ] Liveness probe passing
+- [ ] Readiness probe passing
+- [ ] Service `db-service` created
+- [ ] Database logs show "database system is ready to accept connections"
+- [ ] No error events
+
+**Troubleshooting**:
+```bash
+# If pod not starting
+kubectl describe pod postgres-0 -n names-app
+kubectl logs postgres-0 -n names-app
+
+# If PVC not binding
+kubectl describe pvc postgres-pvc -n names-app
+kubectl get pv
+
+# Check events
+kubectl get events -n names-app --sort-by='.lastTimestamp'
+```
+
+---
+
+### Task 4.3: Deploy Backend API (Deployment, Service)
+**Estimated Time**: 1 hour
+**Priority**: CRITICAL
+**Depends On**: Task 4.2
+
+**Description**: Deploy Flask backend with database connectivity
+
+**Steps**:
+1. Apply backend Deployment: `kubectl apply -f k8s/backend-deployment.yaml`
+2. Apply backend Service: `kubectl apply -f k8s/backend-service.yaml`
+3. Wait for pods to be ready
+4. Check backend can connect to database
+5. Verify health endpoints
+
+**Commands**:
+```bash
+# Apply backend resources
+kubectl apply -f k8s/backend-deployment.yaml
+kubectl apply -f k8s/backend-service.yaml
+
+# Wait for backend
+kubectl wait --for=condition=available deployment/backend -n names-app --timeout=300s
+
+# Check status
+kubectl get deployment -n names-app
+kubectl get pods -n names-app -l app=backend
+kubectl get svc -n names-app
+
+# Check backend logs
+kubectl logs -l app=backend -n names-app --tail=50
+
+# Test health endpoints from within cluster
+kubectl run test-pod --rm -i --tty --image=curlimages/curl -n names-app -- \
+  curl http://api-service:5000/healthz
+
+kubectl run test-pod --rm -i --tty --image=curlimages/curl -n names-app -- \
+  curl http://api-service:5000/api/health/db
+```
+
+**Acceptance Criteria**:
+- [ ] Deployment `backend` shows 2/2 replicas ready
+- [ ] Both backend pods in Running status
+- [ ] Liveness probes passing (`/healthz`)
+- [ ] Readiness probes passing (`/api/health/db`)
+- [ ] Service `api-service` created
+- [ ] Backend logs show successful database connection
+- [ ] `/healthz` returns 200 OK
+- [ ] `/api/health/db` returns healthy status
+- [ ] No error events
+
+**Troubleshooting**:
+```bash
+# If pods not starting
+kubectl describe deployment backend -n names-app
+kubectl describe pod <backend-pod> -n names-app
+kubectl logs <backend-pod> -n names-app
+
+# If image pull issues
+kubectl describe pod <backend-pod> -n names-app | grep -i image
+sudo crictl images | grep names
+
+# Check database connectivity
+kubectl exec -it <backend-pod> -n names-app -- env | grep DATABASE
+```
+
+---
+
+### Task 4.4: Deploy Frontend (Deployment, NodePort Service)
+**Estimated Time**: 1 hour
+**Priority**: CRITICAL
+**Depends On**: Task 4.3
+
+**Description**: Deploy Nginx frontend with external access
+
+**Steps**:
+1. Apply frontend Deployment: `kubectl apply -f k8s/frontend-deployment.yaml`
+2. Apply frontend Service: `kubectl apply -f k8s/frontend-service.yaml`
+3. Wait for pod to be ready
+4. Get NodePort number
+5. Get VM IP
+6. Access application in browser
+
+**Commands**:
+```bash
+# Apply frontend resources
+kubectl apply -f k8s/frontend-deployment.yaml
+kubectl apply -f k8s/frontend-service.yaml
+
+# Wait for frontend
+kubectl wait --for=condition=available deployment/frontend -n names-app --timeout=300s
+
+# Get all resources
+kubectl get all -n names-app
+
+# Get NodePort
+kubectl get svc frontend-service -n names-app
+# Note the NodePort (e.g., 80:30080/TCP)
+
+# Get VM IP (should be 192.168.56.10)
+vagrant ssh k3s-server -- ip addr show eth1 | grep "inet "
+
+# Access in browser
+# URL: http://192.168.56.10:<NODE_PORT>
+```
+
+**Acceptance Criteria**:
+- [ ] Deployment `frontend` shows 1/1 replica ready
+- [ ] Frontend pod in Running status
+- [ ] Service `frontend-service` created with NodePort
+- [ ] NodePort in range 30000-32767
+- [ ] Application accessible via http://<VM_IP>:<NODE_PORT>
+- [ ] Frontend can communicate with backend
+- [ ] No error events
+
+**Browser Testing**:
+1. Open browser to `http://192.168.56.10:<NODE_PORT>`
+2. Verify page loads
+3. Try adding a name
+4. Verify name appears in list
+5. Try deleting a name
+
+---
+
+### Task 4.5: End-to-End Functional Testing
+**Estimated Time**: 1 hour
+**Priority**: CRITICAL
+**Depends On**: Task 4.4
+
+**Description**: Test all application features work in k3s deployment
+
+**Steps**:
+1. Access application in browser
+2. Test add name functionality
+3. Test view names with timestamps
+4. Test delete name functionality
+5. Test data persistence (restart database pod)
+6. Verify all pods healthy
+
+**Test Scenarios**:
+1. **Add Name**: Enter "Alice Smith", verify appears with timestamp
+2. **Add Multiple**: Add 3-5 names, verify all display
+3. **Delete Name**: Delete middle name, verify removed
+4. **Data Persistence**: Restart database pod, verify data still exists
+5. **Backend Scaling**: Verify 2 backend pods handle requests
+6. **Health Checks**: All probes passing
+
+**Commands**:
+```bash
+# Check all pods running
+kubectl get pods -n names-app
+
+# Test data persistence
+kubectl delete pod postgres-0 -n names-app
+kubectl wait --for=condition=ready pod/postgres-0 -n names-app --timeout=120s
+# Refresh browser, verify data still present
+
+# Check all health probes
+kubectl get pods -n names-app -o wide
+
+# View logs
+kubectl logs -l app=backend -n names-app --tail=20
+kubectl logs -l app=frontend -n names-app --tail=20
+kubectl logs postgres-0 -n names-app --tail=20
+
+# Check events
+kubectl get events -n names-app --sort-by='.lastTimestamp'
+```
+
+**Acceptance Criteria**:
+- [ ] Can add names successfully
+- [ ] Names display with timestamps
+- [ ] Can delete names by ID
+- [ ] Data persists after database pod restart
+- [ ] Backend 2 replicas handling requests
+- [ ] Frontend accessible and responsive
+- [ ] All health checks passing
+- [ ] No error events
+- [ ] Application fully functional
 gunzip < names-backend.tar.gz | docker load
 gunzip < names-frontend.tar.gz | docker load
 docker images | grep names
@@ -1201,46 +2210,303 @@ curl http://localhost:8080/api/names | grep "Persistence Test"
 
 ---
 
-## Phase 5: Production Hardening & Operations (Days 19-21)
+## Phase 5: Production Hardening & Optimization (Days 14-16, Optional)
 
-### Task 5.0: Ensure compose.yaml for Local Development
-**Estimated Time**: 1 hour
-**Priority**: HIGH
-**Depends On**: Phase 0 complete
+### Task 5.1: Add Resource Requests and Limits
+**Estimated Time**: 1-2 hours
+**Priority**: MEDIUM
+**Depends On**: Phase 4 complete
 
-**Description**: Ensure docker-compose.yml (or compose.yaml) works for local development
+**Description**: Configure resource management for all workloads
+
+**Note**: This task is optional but recommended for production
 
 **Steps**:
-1. Verify current `src/docker-compose.yml` exists
-2. Optionally rename to `src/compose.yaml` (newer standard)
-3. Ensure it includes all bug fixes from Phase 0
-4. Test local development workflow
-5. Document usage in README
+1. Add resources to database StatefulSet
+2. Add resources to backend Deployment (already in manifest)
+3. Add resources to frontend Deployment (already in manifest)
+4. Apply updated manifests
+5. Monitor resource usage
+6. Adjust values based on actual usage
 
-**Files to Verify/Modify**:
-- `src/docker-compose.yml` or `src/compose.yaml`
+**Resources to Configure**:
+- Database: 512Mi-1Gi memory, 250m-500m CPU
+- Backend: 256Mi-512Mi memory, 250m-500m CPU (already configured)
+- Frontend: 128Mi-256Mi memory, 100m-200m CPU (already configured)
 
-**Acceptance Criteria**:
-- [x] Compose file exists for single-host local development
-- [x] Contains all bug fixes (DATABASE_URL support, etc.)
-- [x] Works with `docker-compose up` or `docker compose up`
-- [x] Documented as development workflow
-- [x] Separate from production stack.yaml
-
-**Testing**:
+**Commands**:
 ```bash
-cd src/
-docker-compose up --build
-# or
-docker compose up --build
+# Check current resource usage
+kubectl top nodes
+kubectl top pods -n names-app
 
-# Test all functionality
-# Open http://localhost:8080
-# Verify CRUD operations work
-docker-compose down
+# Apply updated manifests (if changed)
+kubectl apply -f k8s/database-statefulset.yaml
+kubectl rollout status statefulset/postgres -n names-app
+
+# Verify resources
+kubectl describe pod postgres-0 -n names-app | grep -A 5 "Requests\|Limits"
+kubectl describe pod <backend-pod> -n names-app | grep -A 5 "Requests\|Limits"
 ```
 
-**Note**: This file remains unchanged or improved for local development. Production uses `swarm/stack.yaml`.
+**Acceptance Criteria**:
+- [ ] All workloads have resource requests defined
+- [ ] Resource limits prevent resource exhaustion
+- [ ] Pods schedule successfully with resources
+- [ ] No pods in Pending due to insufficient resources
+
+---
+
+### Task 5.2: Create HorizontalPodAutoscaler (Optional)
+**Estimated Time**: 1 hour
+**Priority**: LOW
+**Depends On**: Task 5.1
+
+**Description**: Configure automatic scaling for backend based on CPU usage
+
+**Note**: This task is optional and requires metrics-server
+
+**Steps**:
+1. Verify metrics-server running in k3s (usually included)
+2. Create `k8s/backend-hpa.yaml`
+3. Apply HPA
+4. Test scaling behavior
+5. Monitor autoscaling events
+
+**File to Create**:
+- `k8s/backend-hpa.yaml`
+
+**File Content**:
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-hpa
+  namespace: names-app
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+```
+
+**Commands**:
+```bash
+# Check if metrics-server running
+kubectl get pods -n kube-system | grep metrics
+
+# Apply HPA
+kubectl apply -f k8s/backend-hpa.yaml
+
+# Check HPA status
+kubectl get hpa -n names-app
+kubectl describe hpa backend-hpa -n names-app
+
+# Watch autoscaling
+kubectl get hpa -n names-app --watch
+```
+
+**Acceptance Criteria**:
+- [ ] Metrics-server running
+- [ ] HPA created successfully
+- [ ] Min replicas: 2, Max replicas: 5
+- [ ] HPA shows current CPU utilization
+- [ ] Can scale up under load
+- [ ] Can scale down when idle
+
+---
+
+### Task 5.3: Document Operations Procedures
+**Estimated Time**: 2-3 hours
+**Priority**: HIGH
+**Depends On**: Phase 4 complete
+
+**Description**: Create comprehensive operations guide
+
+**Steps**:
+1. Create or update `docs/OPERATIONS.md`
+2. Document common kubectl commands
+3. Document troubleshooting procedures
+4. Document backup/restore procedures
+5. Document scaling procedures
+6. Document update procedures
+
+**File to Create/Update**:
+- `docs/OPERATIONS.md`
+
+**Sections to Include**:
+- Accessing the cluster
+- Viewing logs
+- Checking pod status
+- Restarting pods
+- Scaling deployments
+- Updating images
+- Database backup/restore
+- Common troubleshooting steps
+
+**Example Content**:
+```markdown
+# Kubernetes Operations Guide
+
+## Accessing the Cluster
+\`\`\`bash
+# Ensure kubeconfig is set
+export KUBECONFIG=~/.kube/config
+
+# Test connection
+kubectl cluster-info
+kubectl get nodes
+\`\`\`
+
+## Viewing Logs
+\`\`\`bash
+# View all backend logs
+kubectl logs -l app=backend -n names-app --tail=100 -f
+
+# View specific pod logs
+kubectl logs postgres-0 -n names-app
+
+# View previous pod logs (after crash)
+kubectl logs <pod-name> -n names-app --previous
+\`\`\`
+
+## Checking Status
+\`\`\`bash
+# Get all resources
+kubectl get all -n names-app
+
+# Check pod status
+kubectl get pods -n names-app -o wide
+
+# Describe pod for details
+kubectl describe pod <pod-name> -n names-app
+
+# Check events
+kubectl get events -n names-app --sort-by='.lastTimestamp'
+\`\`\`
+
+## Restarting Pods
+\`\`\`bash
+# Restart deployment (rolling restart)
+kubectl rollout restart deployment/backend -n names-app
+kubectl rollout restart deployment/frontend -n names-app
+
+# Delete specific pod (will be recreated)
+kubectl delete pod <pod-name> -n names-app
+
+# Restart StatefulSet
+kubectl rollout restart statefulset/postgres -n names-app
+\`\`\`
+
+## Scaling
+\`\`\`bash
+# Scale backend
+kubectl scale deployment/backend --replicas=3 -n names-app
+
+# Check scaling
+kubectl get deployment backend -n names-app
+\`\`\`
+
+## Updating Images
+\`\`\`bash
+# Build new images, save, transfer, import to k3s
+
+# Update deployment
+kubectl set image deployment/backend backend=names-backend:v2 -n names-app
+
+# Or edit deployment
+kubectl edit deployment backend -n names-app
+
+# Check rollout status
+kubectl rollout status deployment/backend -n names-app
+
+# Rollback if needed
+kubectl rollout undo deployment/backend -n names-app
+\`\`\`
+\`\`\`
+
+**Acceptance Criteria**:
+- [ ] Operations guide created
+- [ ] All common commands documented
+- [ ] Troubleshooting section included
+- [ ] Examples tested and working
+- [ ] Guide reviewed and accurate
+
+---
+
+### Task 5.4: Create Deployment Helper Scripts (Optional)
+**Estimated Time**: 2 hours
+**Priority**: LOW
+**Depends On**: Phase 4 complete
+
+**Description**: Create shell scripts for common operations
+
+**Steps**:
+1. Create `ops/` directory if needed
+2. Create `ops/deploy-k3s.sh` for full deployment
+3. Create `ops/cleanup.sh` for removing deployment
+4. Create `ops/update.sh` for updating images
+5. Make scripts executable
+6. Test all scripts
+
+**Scripts to Create**:
+- `ops/deploy-k3s.sh` - Full deployment automation
+- `ops/cleanup.sh` - Remove all resources
+- `ops/update.sh` - Update images and redeploy
+
+**Example deploy-k3s.sh**:
+```bash
+#!/bin/bash
+set -e
+
+echo "=== Deploying Names Manager to k3s ==="
+
+# Apply all manifests
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/secret.yaml
+kubectl apply -f k8s/database-pvc.yaml
+kubectl apply -f k8s/database-statefulset.yaml
+kubectl apply -f k8s/database-service.yaml
+kubectl apply -f k8s/backend-deployment.yaml
+kubectl apply -f k8s/backend-service.yaml
+kubectl apply -f k8s/frontend-deployment.yaml
+kubectl apply -f k8s/frontend-service.yaml
+
+# Wait for resources
+echo "Waiting for database..."
+kubectl wait --for=condition=ready pod/postgres-0 -n names-app --timeout=300s
+
+echo "Waiting for backend..."
+kubectl wait --for=condition=available deployment/backend -n names-app --timeout=300s
+
+echo "Waiting for frontend..."
+kubectl wait --for=condition=available deployment/frontend -n names-app --timeout=300s
+
+# Show status
+kubectl get all -n names-app
+
+# Get NodePort
+echo ""
+echo "Application deployed successfully!"
+echo "Access at: http://192.168.56.10:\$(kubectl get svc frontend-service -n names-app -o jsonpath='{.spec.ports[0].nodePort}')"
+```
+
+**Acceptance Criteria**:
+- [ ] Deploy script automates full deployment
+- [ ] Cleanup script removes all resources
+- [ ] Update script handles image updates
+- [ ] All scripts executable
+- [ ] Scripts tested and working
 
 ---
 
@@ -2133,47 +3399,144 @@ This comprehensive task breakdown provides clear, actionable steps for completin
 - Document any deviations from the plan
 - Keep Docker Compose working for local development throughout
 
+---
+
 ## Quick Reference
 
-### Key Files
-- `swarm/stack.yaml` - Swarm stack configuration (REQUIRED)
-- `Vagrantfile` - VM definitions
-- `src/build-images.sh` - Build automation
-- `src/deploy.sh` - Deployment automation  
-- `vagrant/install-docker.sh` - Docker installation
+### Key Files (k3s Migration)
+- `k8s/` directory - All Kubernetes manifests
+- `k8s/namespace.yaml` - Namespace definition
+- `k8s/*-deployment.yaml` - Deployments for backend, frontend
+- `k8s/*-statefulset.yaml` - StatefulSet for database
+- `k8s/*-service.yaml` - Services for networking
+- `k8s/configmap.yaml` - Application configuration
+- `k8s/secret.yaml` - Database credentials
+- `Vagrantfile` - k3s-server VM definition
 
-### Key Commands
+### Key Commands (k3s)
 ```bash
 # VMs
-vagrant up
-vagrant ssh manager
-vagrant ssh worker
-vagrant destroy -f
+vagrant up k3s-server
+vagrant ssh k3s-server
+vagrant destroy -f k3s-server
 
-# Swarm
-docker node ls
-docker network ls
-docker stack deploy -c swarm/stack.yaml names-app
-docker stack services names-app
-docker stack ps names-app
-docker stack rm names-app
+# kubectl - Cluster
+kubectl cluster-info
+kubectl get nodes
+kubectl top nodes
 
-# Services
-docker service ls
-docker service ps <service-name>
-docker service logs <service-name>
-docker service scale <service-name>=<replicas>
+# kubectl - Deployments
+kubectl get all -n names-app
+kubectl get pods -n names-app
+kubectl get deployments -n names-app
+kubectl get services -n names-app
 
-# Node labeling
-docker node update --label-add role=db <node-id>
+# kubectl - Logs
+kubectl logs -l app=backend -n names-app --tail=50 -f
+kubectl logs postgres-0 -n names-app
+kubectl logs -l app=frontend -n names-app
+
+# kubectl - Apply/Delete
+kubectl apply -f k8s/
+kubectl delete namespace names-app
+
+# kubectl - Scaling
+kubectl scale deployment/backend --replicas=3 -n names-app
+kubectl rollout restart deployment/backend -n names-app
+
+# kubectl - Debugging
+kubectl describe pod <pod-name> -n names-app
+kubectl exec -it <pod-name> -n names-app -- /bin/sh
+kubectl get events -n names-app --sort-by='.lastTimestamp'
 ```
 
-### Access Points
-- Application: http://localhost:8080
-- Health Check: http://localhost:8080/api/health
-- DB Health: http://localhost:8080/api/health/db
+### Access Points (k3s)
+- Application: http://192.168.56.10:<NodePort> (get NodePort with `kubectl get svc frontend-service -n names-app`)
+- Check NodePort: `kubectl get svc frontend-service -n names-app -o jsonpath='{.spec.ports[0].nodePort}'`
+- Health checks accessible within cluster via api-service:5000
 
-This task list provides a complete, step-by-step guide for migrating the Names Manager application to Docker Swarm orchestration.
+### Container Image Management
+```bash
+# Build
+docker build -t names-backend:latest backend/
+docker build -t names-frontend:latest frontend/
+
+# Save
+docker save names-backend:latest > names-backend.tar
+docker save names-frontend:latest > names-frontend.tar
+
+# Transfer
+scp -P $(vagrant port k3s-server --guest 22) names-*.tar vagrant@localhost:/tmp/
+
+# Import to k3s
+vagrant ssh k3s-server
+sudo k3s ctr images import /tmp/names-backend.tar
+sudo k3s ctr images import /tmp/names-frontend.tar
+sudo crictl images | grep names
+```
+
+### Development Workflow
+```bash
+# Local development (Docker Compose)
+cd src/
+docker-compose up --build
+
+# Production deployment (k3s)
+# 1. Build images
+# 2. Transfer to VM
+# 3. Import to containerd
+# 4. Apply manifests: kubectl apply -f k8s/
+```
+
+---
+
+## Task Summary
+
+### Phase 0: Prerequisites (1 day, 2-4 hours)
+- ✅ Verify application functional
+- Install kubectl
+- Verify Vagrant/VirtualBox
+- Create k3s-orchestration branch
+
+### Phase 1: Infrastructure (2-3 days, 6-8 hours)
+- Create/update Vagrantfile for k3s
+- Start k3s-server VM
+- Configure kubectl access from laptop
+- (Optional) Add k3s-agent node
+
+### Phase 2: Manifests (3-4 days, 12-15 hours)
+- Create k8s/ directory
+- Create namespace, ConfigMap, Secret
+- Create database PVC, StatefulSet, Service
+- Create backend Deployment, Service
+- Create frontend Deployment, NodePort Service
+- Validate all manifests
+
+### Phase 3: Images (1-2 days, 4-6 hours)
+- Build container images
+- Save to TAR archives
+- Transfer to k3s-server VM
+- Import into containerd
+- Verify with crictl
+
+### Phase 4: Deployment (2-3 days, 10-12 hours)
+- Apply namespace and configuration
+- Deploy database with persistent storage
+- Deploy backend API
+- Deploy frontend with NodePort
+- End-to-end functional testing
+
+### Phase 5: Hardening (2-3 days, 8-10 hours, Optional)
+- Add resource requests/limits
+- Create HorizontalPodAutoscaler
+- Document operations procedures
+- Create deployment helper scripts
+
+**Total Estimated Time**: 11-16 days, 42-55 hours
+
+---
+
+This task list provides a complete, step-by-step guide for migrating the Names Manager application to k3s (Lightweight Kubernetes) orchestration.
 **Estimated Time**: 3-4 hours
 **Priority**: High
 **Depends On**: Task 1.1
