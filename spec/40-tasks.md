@@ -1209,6 +1209,8 @@ vagrant ssh k3s-server -- 'ls -lh /tmp/names-*.tar'
 
 **Description**: Import Docker images into k3s containerd runtime
 
+**Status**: ✅ COMPLETED
+
 **Steps**:
 1. SSH into k3s-server
 2. Import backend image using `k3s ctr`
@@ -1218,36 +1220,27 @@ vagrant ssh k3s-server -- 'ls -lh /tmp/names-*.tar'
 
 **Commands**:
 ```bash
-# SSH into VM
-vagrant ssh k3s-server
-
 # Import images to containerd
-sudo k3s ctr images import /tmp/names-backend.tar
-sudo k3s ctr images import /tmp/names-frontend.tar
+vagrant ssh k3s-server -c 'sudo k3s ctr images import /tmp/names-backend.tar'
+vagrant ssh k3s-server -c 'sudo k3s ctr images import /tmp/names-frontend.tar'
 
 # Verify with crictl (Kubernetes CRI tool)
-sudo crictl images | grep names
+vagrant ssh k3s-server -c 'sudo crictl images | grep names'
 
-# Alternative: Import with ctr in k8s.io namespace
-sudo ctr -n k8s.io images import /tmp/names-backend.tar
-sudo ctr -n k8s.io images import /tmp/names-frontend.tar
+# Verify in k8s.io namespace
+vagrant ssh k3s-server -c 'sudo ctr -n k8s.io images ls | grep names'
 
-# List images
-sudo ctr -n k8s.io images ls | grep names
-
-# Clean up
-rm /tmp/names-backend.tar /tmp/names-frontend.tar
-
-# Exit VM
-exit
+# Clean up TAR files
+vagrant ssh k3s-server -c 'rm /tmp/names-backend.tar /tmp/names-frontend.tar'
 ```
 
 **Acceptance Criteria**:
-- [ ] Backend image imported successfully
-- [ ] Frontend image imported successfully
-- [ ] `crictl images` shows both images
-- [ ] Images in containerd k8s.io namespace
-- [ ] No import errors in logs
+- [x] Backend image imported successfully (156.7 MiB)
+- [x] Frontend image imported successfully (22.0 MiB)
+- [x] `crictl images` shows both images
+- [x] Images in containerd k8s.io namespace (verified)
+- [x] No import errors in logs
+- [x] TAR files cleaned up
 
 **Expected Output**:
 ```
