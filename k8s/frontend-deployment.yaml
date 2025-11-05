@@ -13,6 +13,8 @@ spec:
       labels:
         app: frontend
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: k3s-server
       containers:
       - name: frontend
         image: names-frontend:latest
