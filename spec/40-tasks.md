@@ -1082,12 +1082,14 @@ done
 
 **Description**: Build backend and frontend Docker images on laptop
 
-**Note**: Application code is already functional from previous work. We're rebuilding images for k3s deployment.
+**Status**: ✅ COMPLETED
+
+**Note**: Application code is already functional from previous work. We're rebuilding images for k3s deployment. Frontend image uses `nginx.k8s.conf` for Kubernetes-specific configuration.
 
 **Steps**:
 1. Navigate to src directory
 2. Build backend image: `docker build -t names-backend:latest backend/`
-3. Build frontend image: `docker build -t names-frontend:latest frontend/`
+3. Build frontend image with k8s nginx config
 4. Verify images created
 
 **Commands**:
@@ -1097,18 +1099,27 @@ cd src/
 # Build backend
 docker build -t names-backend:latest backend/
 
-# Build frontend
-docker build -t names-frontend:latest frontend/
+# Build frontend with k8s nginx config
+cd frontend
+docker build -t names-frontend:latest -f - . << 'EOF'
+FROM nginx:alpine
+COPY nginx.k8s.conf /etc/nginx/conf.d/default.conf
+COPY index.html /usr/share/nginx/html/index.html
+COPY app.js /usr/share/nginx/html/app.js
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+EOF
 
 # Verify
 docker images | grep names
 ```
 
 **Acceptance Criteria**:
-- [ ] Backend image builds successfully
-- [ ] Frontend image builds successfully
-- [ ] Images tagged as `names-backend:latest` and `names-frontend:latest`
-- [ ] No build errors
+- [x] Backend image builds successfully (708MB)
+- [x] Frontend image builds successfully (81MB)
+- [x] Images tagged as `names-backend:latest` and `names-frontend:latest`
+- [x] No build errors
+- [x] Frontend uses nginx.k8s.conf for k8s deployment
 
 ---
 
