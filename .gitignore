@@ -6,3 +6,8 @@
 # Swarm tokens (contains secrets)
 vagrant/swarm-join-tokens.md
 
+# Kubernetes config files (contains private keys)
+k3s-config.yaml
+*.kubeconfig
+.kube/
+
