@@ -1917,11 +1917,38 @@ kubectl rollout undo deployment/backend -n names-app
 \`\`\`
 
 **Acceptance Criteria**:
-- [ ] Operations guide created
-- [ ] All common commands documented
-- [ ] Troubleshooting section included
-- [ ] Examples tested and working
-- [ ] Guide reviewed and accurate
+- [x] Operations guide created
+- [x] All common commands documented
+- [x] Troubleshooting section included
+- [x] Examples tested and working
+- [x] Guide reviewed and accurate
+
+**Verification Results**:
+```
+Date: 2025-11-05
+Status: ✅ COMPLETE
+
+Created comprehensive operations guide: docs/OPERATIONS.md
+
+Sections included:
+1. Prerequisites - Access requirements and verification
+2. Common Operations - Status viewing, logs, exec commands, resource usage
+3. Deployment Procedures - Initial deployment, updates, restarts
+4. Monitoring & Health Checks - Health endpoints, pod status, connectivity
+5. Scaling Operations - Manual scaling and HPA management
+6. Backup & Restore - Database backup/restore, config backup, PV backup
+7. Troubleshooting - Pod issues, database, API, frontend, network, resources
+8. Emergency Procedures - Complete restart, cleanup/redeploy, recovery
+
+Key features:
+- All kubectl commands documented and tested
+- Troubleshooting procedures for common issues
+- Emergency recovery procedures
+- Quick reference section with useful aliases
+- Maintenance checklist included
+
+The guide provides complete operational coverage for k3s deployment.
+```
 
 ---
 
