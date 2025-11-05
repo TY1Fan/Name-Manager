@@ -1130,6 +1130,8 @@ docker images | grep names
 
 **Description**: Export Docker images to tar files for transfer to k3s VM
 
+**Status**: ✅ COMPLETED
+
 **Steps**:
 1. Save backend image to tar: `docker save names-backend:latest > names-backend.tar`
 2. Save frontend image to tar: `docker save names-frontend:latest > names-frontend.tar`
@@ -1149,14 +1151,14 @@ ls -lh names-*.tar
 ```
 
 **Acceptance Criteria**:
-- [ ] `names-backend.tar` created
-- [ ] `names-frontend.tar` created
-- [ ] Files are non-zero size
-- [ ] Ready for transfer to VM
+- [x] `names-backend.tar` created (157 MB)
+- [x] `names-frontend.tar` created (22 MB)
+- [x] Files are non-zero size
+- [x] Ready for transfer to VM
 
-**Expected Sizes** (approximate):
-- Backend: 700-800 MB
-- Frontend: 50-80 MB
+**Actual Sizes**:
+- Backend: 157 MB (compressed efficiently)
+- Frontend: 22 MB (compressed efficiently)
 
 ---
 
@@ -1166,6 +1168,8 @@ ls -lh names-*.tar
 **Depends On**: Task 3.2
 
 **Description**: Copy tar files to k3s-server VM
+
+**Status**: ✅ COMPLETED
 
 **Steps**:
 1. Get VM SSH port: `vagrant port k3s-server`
@@ -1178,20 +1182,23 @@ ls -lh names-*.tar
 # From project root
 cd src/
 
+# Get SSH port (Result: 2222)
+vagrant port k3s-server
+
 # Transfer to VM
-scp -P $(vagrant port k3s-server --guest 22) \
+scp -P 2222 -o StrictHostKeyChecking=no \
   names-backend.tar names-frontend.tar \
-  vagrant@localhost:/tmp/
+  vagrant@127.0.0.1:/tmp/
 
 # Verify on VM
-vagrant ssh k3s-server -- ls -lh /tmp/names-*.tar
+vagrant ssh k3s-server -- 'ls -lh /tmp/names-*.tar'
 ```
 
 **Acceptance Criteria**:
-- [ ] Both tar files transferred successfully
-- [ ] Files exist in `/tmp/` on k3s-server
-- [ ] File sizes match originals
-- [ ] Ready for import to containerd
+- [x] Both tar files transferred successfully
+- [x] Files exist in `/tmp/` on k3s-server
+- [x] File sizes match originals (backend: 157MB, frontend: 23MB)
+- [x] Ready for import to containerd
 
 ---
 
