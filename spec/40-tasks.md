@@ -380,333 +380,29 @@ kubectl get nodes
 - [ ] Pods can be scheduled on agent
 
 **Note**: If skipping this task, continue with single-node cluster.
-4. Configure port forwarding: 80:8080 on manager
-5. Set up provisioning script path
-
-**Files to Create**:
-- `Vagrantfile`
-
-**Vagrantfile Template**:
-```ruby
-Vagrant.configure("2") do |config|
-  config.vm.define "manager" do |manager|
-    manager.vm.box = "bento/ubuntu-22.04"
-    manager.vm.hostname = "swarm-manager"
-    manager.vm.network "private_network", ip: "192.168.56.10"
-    manager.vm.network "forwarded_port", guest: 80, host: 8080
-    manager.vm.provider "virtualbox" do |vb|
-      vb.memory = "2048"
-      vb.cpus = 2
-      vb.name = "names-manager"
-    end
-    manager.vm.provision "shell", path: "vagrant/install-docker.sh"
-  end
-  
-  config.vm.define "worker" do |worker|
-    worker.vm.box = "bento/ubuntu-22.04"
-    worker.vm.hostname = "swarm-worker"
-    worker.vm.network "private_network", ip: "192.168.56.11"
-    worker.vm.provider "virtualbox" do |vb|
-      vb.memory = "2048"
-      vb.cpus = 2
-      vb.name = "names-worker"
-    end
-    worker.vm.provision "shell", path: "vagrant/install-docker.sh"
-  end
-end
-```
-
-**Acceptance Criteria**:
-- [x] Vagrantfile validates without errors (✅ vagrant validate passed)
-- [x] Manager VM configured with correct specs (✅ 2GB RAM, 2 CPU, 192.168.56.10)
-- [x] Worker VM configured with correct specs (✅ 2GB RAM, 2 CPU, 192.168.56.11)
-- [x] Private network configured (✅ 192.168.56.0/24)
-- [x] Port forwarding set up (✅ 80:8080 on manager)
-
----
-
-### Task 1.3: Create Docker Installation Script
-**Estimated Time**: 1 hour
-**Priority**: HIGH
-**Depends On**: Task 1.2
-
-**Description**: Script to install Docker Engine on both VMs
-
-**Steps**:
-1. Create directory: `mkdir -p vagrant`
-2. Create `vagrant/install-docker.sh`
-3. Add Docker installation commands for Ubuntu
-4. Make script executable
-5. Test script syntax
-
-**Files to Create**:
-- `vagrant/install-docker.sh`
-
-**Script Content**:
-```bash
-#!/bin/bash
-set -e
-
-echo "Installing Docker on $(hostname)..."
-
-# Update package index
-apt-get update
-
-# Install prerequisites
-apt-get install -y \
-    ca-certificates \
-    curl \
-    gnupg \
-    lsb-release
-
-# Add Docker GPG key
-mkdir -p /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
-    gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-
-# Add Docker repository
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-  https://download.docker.com/linux/ubuntu \
-  $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-# Install Docker
-apt-get update
-apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-
-# Add vagrant user to docker group
-usermod -aG docker vagrant
-
-# Enable Docker service
-systemctl enable docker
-systemctl start docker
-
-echo "Docker installation complete!"
-docker --version
-```
-
-**Acceptance Criteria**:
-- [x] Script has execute permissions (✅ -rwxr-xr-x)
-- [x] Script installs Docker CE (✅ docker-ce, docker-ce-cli, containerd.io)
-- [x] Script adds vagrant user to docker group (✅ usermod -aG docker vagrant)
-- [x] Script enables Docker service (✅ systemctl enable/start docker)
-
----
-
-### Task 1.4: Start and Verify VMs
-**Estimated Time**: 1 hour
-**Priority**: HIGH
-**Depends On**: Tasks 1.2, 1.3
-
-**Description**: Bring up both VMs and verify basic connectivity
-
-**Steps**:
-1. Start VMs: `vagrant up`
-2. Wait for provisioning to complete
-3. Check VM status: `vagrant status`
-4. SSH to manager: `vagrant ssh manager`
-5. SSH to worker: `vagrant ssh worker`
-6. Verify Docker on both VMs
-
-**Acceptance Criteria**:
-- [x] Both VMs start successfully (✅ both running)
-- [x] Docker installed on manager VM (✅ Docker 28.5.1)
-- [x] Docker installed on worker VM (✅ Docker 28.5.1)
-- [x] Can SSH to both VMs (✅ vagrant ssh works)
-- [x] `docker --version` works on both (✅ verified)
-
-**Testing**:
-```bash
-vagrant up
-vagrant status  # Both should show "running"
-vagrant ssh manager -c "docker --version"
-vagrant ssh worker -c "docker --version"
-vagrant ssh manager -c "ping -c 3 192.168.56.11"
-vagrant ssh worker -c "ping -c 3 192.168.56.10"
-```
-
----
-
-### Task 1.5: Initialize Docker Swarm on Manager
-**Estimated Time**: 30 minutes
-**Priority**: HIGH
-**Depends On**: Task 1.4
-
-**Description**: Initialize Swarm cluster on manager node
-
-**Steps**:
-1. SSH to manager: `vagrant ssh manager`
-2. Initialize Swarm: `docker swarm init --advertise-addr 192.168.56.10`
-3. Save the worker join token (IMPORTANT!)
-4. Verify Swarm status: `docker node ls`
-
-**Acceptance Criteria**:
-- [x] Swarm initialized successfully (✅ Swarm active)
-- [x] Manager node shows as Leader (✅ MANAGER STATUS: Leader)
-- [x] Join token saved securely (✅ saved in vagrant/swarm-join-tokens.md)
-- [x] `docker node ls` shows 1 node (✅ swarm-manager Ready/Active)
-
-**Commands**:
-```bash
-vagrant ssh manager
-docker swarm init --advertise-addr 192.168.56.10
-
-# Save this output!
-# Example: docker swarm join --token SWMTKN-1-xxx... 192.168.56.10:2377
-
-docker node ls
-# Should show 1 node with MANAGER STATUS = Leader
-```
-
----
-
-### Task 1.6: Join Worker to Swarm
-**Estimated Time**: 30 minutes
-**Priority**: HIGH
-**Depends On**: Task 1.5
-
-**Description**: Add worker node to Swarm cluster
-
-**Steps**:
-1. SSH to worker: `vagrant ssh worker`
-2. Run join command from Task 1.5 output
-3. Return to manager and verify: `docker node ls`
-4. Should see 2 nodes (1 manager, 1 worker)
-
-**Acceptance Criteria**:
-- [x] Worker joins Swarm successfully (✅ "This node joined a swarm as a worker")
-- [x] `docker node ls` shows 2 nodes (✅ swarm-manager + swarm-worker)
-- [x] Manager shows as Leader (✅ MANAGER STATUS: Leader)
-- [x] Worker shows as Active (✅ STATUS: Ready, AVAILABILITY: Active)
-
-**Commands**:
-```bash
-# On worker VM
-vagrant ssh worker
-docker swarm join --token <TOKEN_FROM_TASK_1.5> 192.168.56.10:2377
-
-# Back on manager VM
-vagrant ssh manager
-docker node ls
-# Should show:
-# ID     HOSTNAME        STATUS  AVAILABILITY  MANAGER STATUS
-# xxx    swarm-manager   Ready   Active        Leader
-# yyy    swarm-worker    Ready   Active
-```
-
----
-
-### Task 1.7: Label Worker Node for Database
-**Estimated Time**: 15 minutes
-**Priority**: CRITICAL
-**Depends On**: Task 1.6
-
-**Description**: Add custom label `role=db` to worker node (REQUIRED for placement)
-
-**Steps**:
-1. SSH to manager: `vagrant ssh manager`
-2. Get worker node ID: `docker node ls`
-3. Add label: `docker node update --label-add role=db <worker-node-id>`
-4. Verify label: `docker node inspect <worker-node-id> --format '{{.Spec.Labels}}'`
-
-**Acceptance Criteria**:
-- [x] Worker node labeled with `role=db` (✅ label added)
-- [x] Label visible in node inspection (✅ map[role:db])
-- [x] Label will be used for db service placement (✅ ready for stack deployment)
-
-**Commands**:
-```bash
-vagrant ssh manager
-
-# Get node ID or hostname
-docker node ls
-# Note the worker node ID (first column) or HOSTNAME
-
-# Add label (use either ID or hostname)
-docker node update --label-add role=db swarm-worker
-
-# Verify
-docker node inspect swarm-worker --format '{{.Spec.Labels}}'
-# Expected output: map[role:db]
-```
-
----
-
-### Task 1.8: Create Overlay Network
-**Estimated Time**: 15 minutes
-**Priority**: HIGH
-**Depends On**: Task 1.7
-
-**Description**: Create `appnet` overlay network for service communication
-
-**Steps**:
-1. SSH to manager: `vagrant ssh manager`
-2. Create network: `docker network create --driver overlay --attachable appnet`
-3. Verify: `docker network ls`
-4. Inspect network: `docker network inspect appnet`
-
-**Acceptance Criteria**:
-- [x] Network `appnet` created (✅ ID: vw5v7ddfaytt3s6oq8kbye6p0)
-- [x] Driver is `overlay` (✅ verified)
-- [x] Network is attachable (✅ Attachable: true)
-- [x] Network spans both nodes (✅ Scope: swarm, Subnet: 10.0.1.0/24)
-
-**Commands**:
-```bash
-vagrant ssh manager
-docker network create --driver overlay --attachable appnet
-docker network ls | grep appnet
-# Should show: DRIVER=overlay, SCOPE=swarm
-```
 
 ---
 
 ## Phase 2: Kubernetes Manifests Creation (Days 5-8)
 
-### Task 2.1: Create k8s Directory Structure
-**Estimated Time**: 5 minutes
+### Task 2.1: Create k8s Directory and Namespace Manifest
+**Estimated Time**: 15 minutes
 **Priority**: HIGH
 **Depends On**: Phase 1 complete
 
-**Description**: Create directory for Kubernetes manifests
+**Description**: Create directory for Kubernetes manifests and namespace definition
 
 **Steps**:
 1. Create directory: `mkdir -p k8s`
-2. Verify directory exists
-3. Document purpose in README
+2. Create `k8s/namespace.yaml` for application namespace
+3. Apply namespace to cluster: `kubectl apply -f k8s/namespace.yaml`
+4. Verify namespace created: `kubectl get namespaces`
 
 **Files to Create**:
 - `k8s/` directory
-
-**Acceptance Criteria**:
-- [ ] `k8s/` directory exists at project root
-- [ ] Directory ready for manifest files
-
-**Commands**:
-```bash
-mkdir -p k8s
-ls -la k8s/
-```
-
----
-
-### Task 2.2: Create Namespace Manifest
-**Estimated Time**: 15 minutes
-**Priority**: HIGH
-**Depends On**: Task 2.1
-
-**Description**: Create namespace for isolating application resources
-
-**Steps**:
-1. Create `k8s/namespace.yaml`
-2. Define namespace `names-app`
-3. Add descriptive labels
-4. Test with dry-run
-
-**Files to Create**:
 - `k8s/namespace.yaml`
 
-**File Content**:
+**Namespace Manifest** (`k8s/namespace.yaml`):
 ```yaml
 apiVersion: v1
 kind: Namespace
@@ -714,24 +410,26 @@ metadata:
   name: names-app
   labels:
     app: names-manager
-    environment: production
+    environment: development
 ```
 
 **Acceptance Criteria**:
-- [ ] File `k8s/namespace.yaml` created
-- [ ] Namespace named `names-app`
-- [ ] Labels included
-- [ ] Valid YAML syntax
+- [ ] `k8s/` directory exists at project root
+- [ ] `k8s/namespace.yaml` created
+- [ ] Namespace `names-app` exists in cluster
+- [ ] `kubectl get namespace names-app` shows Active status
 
-**Testing**:
+**Commands**:
 ```bash
-kubectl apply -f k8s/namespace.yaml --dry-run=client
-# Should return: namespace/names-app created (dry run)
+mkdir -p k8s
+kubectl apply -f k8s/namespace.yaml
+kubectl get namespaces
+kubectl describe namespace names-app
 ```
 
 ---
 
-### Task 2.3: Create ConfigMap Manifest
+### Task 2.2: Create ConfigMap Manifest
 **Estimated Time**: 30 minutes
 **Priority**: HIGH
 **Depends On**: Task 2.2
@@ -779,10 +477,10 @@ kubectl apply -f k8s/configmap.yaml --dry-run=client -n names-app
 
 ---
 
-### Task 2.4: Create Secret Manifest
+### Task 2.3: Create Secret Manifest
 **Estimated Time**: 30 minutes
 **Priority**: HIGH
-**Depends On**: Task 2.3
+**Depends On**: Task 2.2
 
 **Description**: Create Secret for database credentials
 
@@ -825,10 +523,10 @@ kubectl apply -f k8s/secret.yaml --dry-run=client -n names-app
 
 ---
 
-### Task 2.5: Create Database PersistentVolumeClaim
+### Task 2.4: Create Database PersistentVolumeClaim
 **Estimated Time**: 30 minutes
 **Priority**: HIGH
-**Depends On**: Task 2.4
+**Depends On**: Task 2.3
 
 **Description**: Create PVC for PostgreSQL persistent storage
 
@@ -871,10 +569,10 @@ kubectl apply -f k8s/database-pvc.yaml --dry-run=client -n names-app
 
 ---
 
-### Task 2.6: Create Database StatefulSet
+### Task 2.5: Create Database StatefulSet
 **Estimated Time**: 1-2 hours
 **Priority**: CRITICAL
-**Depends On**: Task 2.5
+**Depends On**: Task 2.4
 
 **Description**: Create StatefulSet for PostgreSQL database
 
@@ -965,10 +663,10 @@ kubectl apply -f k8s/database-statefulset.yaml --dry-run=client -n names-app
 
 ---
 
-### Task 2.7: Create Database Service
+### Task 2.6: Create Database Service
 **Estimated Time**: 15 minutes
 **Priority**: HIGH
-**Depends On**: Task 2.6
+**Depends On**: Task 2.5
 
 **Description**: Create ClusterIP Service for database access
 
@@ -1015,10 +713,10 @@ kubectl apply -f k8s/database-service.yaml --dry-run=client -n names-app
 
 ---
 
-### Task 2.8: Create Backend Deployment
+### Task 2.7: Create Backend Deployment
 **Estimated Time**: 1-2 hours
 **Priority**: CRITICAL
-**Depends On**: Task 2.7
+**Depends On**: Task 2.6
 
 **Description**: Create Deployment for Flask backend API
 
@@ -1155,10 +853,10 @@ kubectl apply -f k8s/backend-deployment.yaml --dry-run=client -n names-app
 
 ---
 
-### Task 2.9: Create Backend Service
+### Task 2.8: Create Backend Service
 **Estimated Time**: 15 minutes
 **Priority**: HIGH
-**Depends On**: Task 2.8
+**Depends On**: Task 2.7
 
 **Description**: Create ClusterIP Service for backend API access
 
@@ -1205,10 +903,10 @@ kubectl apply -f k8s/backend-service.yaml --dry-run=client -n names-app
 
 ---
 
-### Task 2.10: Create Frontend Deployment
+### Task 2.9: Create Frontend Deployment
 **Estimated Time**: 1 hour
 **Priority**: CRITICAL
-**Depends On**: Task 2.9
+**Depends On**: Task 2.8
 
 **Description**: Create Deployment for Nginx frontend
 
@@ -1275,10 +973,10 @@ kubectl apply -f k8s/frontend-deployment.yaml --dry-run=client -n names-app
 
 ---
 
-### Task 2.11: Create Frontend Service (NodePort)
+### Task 2.10: Create Frontend Service (NodePort)
 **Estimated Time**: 30 minutes
 **Priority**: CRITICAL
-**Depends On**: Task 2.10
+**Depends On**: Task 2.9
 
 **Description**: Create NodePort Service for external frontend access
 
@@ -1377,70 +1075,19 @@ done
 
 ## Phase 3: Container Image Management (Days 9-10)
 
-### Task 3.1: Build Container Images
+### Task 3.1: Build Container Images on Laptop
 **Estimated Time**: 30 minutes
 **Priority**: HIGH
 **Depends On**: Phase 2 complete
 
-**Description**: Build backend and frontend Docker images
+**Description**: Build backend and frontend Docker images on laptop
 
-**Note**: Application code is already functional from previous work
-- [x] Network `appnet` with `external: true` (✅ uses pre-created overlay network)
-- [x] Volume `dbdata` bound to `/var/lib/postgres-data` (✅ configured)
-- [x] DB service: `node.labels.role == db` constraint (✅ placed on worker)
-- [x] API service: DATABASE_URL points to service name `db` (✅ db:5432)
-- [x] Web service: ports `["80:80"]` (✅ configured)
-- [x] Health checks configured (✅ all services)
-- [x] Replica counts set (api:2, web:1, db:1) (✅ verified)
-
----
-
-### Task 2.3: Validate Stack File
-**Estimated Time**: 30 minutes
-**Priority**: HIGH
-**Depends On**: Task 2.2
-
-**Description**: Verify stack file syntax and configuration
-
-**Steps**:
-1. Copy stack.yaml to manager VM
-2. Run: `docker stack config -c swarm/stack.yaml`
-3. Fix any syntax errors
-4. Verify all required fields present
-5. Check service names, network, volume configuration
-
-**Acceptance Criteria**:
-- [x] `docker stack config` validates successfully (✅ SUCCESS)
-- [x] No YAML syntax errors (✅ validated)
-- [x] All services defined correctly (✅ api, db, web)
-- [x] Network and volume properly configured (✅ appnet external, dbdata bind mount)
-
-**Commands**:
-```bash
-# On laptop
-scp -P $(vagrant port manager --guest 22) swarm/stack.yaml vagrant@localhost:/home/vagrant/
-
-# Or use Vagrant shared folder
-vagrant ssh manager
-docker stack config -c /vagrant/swarm/stack.yaml
-# Should output the processed configuration
-```
-
----
-
-### Task 3.2: Build Backend and Frontend Images
-**Estimated Time**: 30 minutes
-**Priority**: HIGH
-**Depends On**: Task 3.1
-
-**Description**: Build Docker images for backend and frontend
-
-**Note**: Images already built and tested with Docker Compose. Rebuild if needed.
+**Note**: Application code is already functional from previous work. We're rebuilding images for k3s deployment.
 
 **Steps**:
 1. Navigate to src directory
-2. Build backend: `docker build -t names-backend:latest backend/`
-3. Build frontend: `docker build -t names-frontend:latest frontend/`
+2. Build backend image: `docker build -t names-backend:latest backend/`
+3. Build frontend image: `docker build -t names-frontend:latest frontend/`
 4. Verify images created
 
 **Commands**:
@@ -1465,10 +1112,10 @@ docker images | grep names
 
 ---
 
-### Task 3.3: Save Images to TAR Archives
+### Task 3.2: Save Images to TAR Archives
 **Estimated Time**: 15 minutes
 **Priority**: HIGH
-**Depends On**: Task 3.2
+**Depends On**: Task 3.1
 
 **Description**: Export Docker images to tar files for transfer to k3s VM
 
@@ -1502,10 +1149,10 @@ ls -lh names-*.tar
 
 ---
 
-### Task 3.4: Transfer Images to k3s-server VM
+### Task 3.3: Transfer Images to k3s-server VM
 **Estimated Time**: 30 minutes
 **Priority**: HIGH
-**Depends On**: Task 3.3
+**Depends On**: Task 3.2
 
 **Description**: Copy tar files to k3s-server VM
 
@@ -1537,10 +1184,10 @@ vagrant ssh k3s-server -- ls -lh /tmp/names-*.tar
 
 ---
 
-### Task 3.5: Import Images into k3s Containerd
+### Task 3.4: Import Images into k3s Containerd
 **Estimated Time**: 30 minutes
 **Priority**: CRITICAL
-**Depends On**: Task 3.4
+**Depends On**: Task 3.3
 
 **Description**: Import Docker images into k3s containerd runtime
 
