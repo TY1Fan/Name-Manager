@@ -1495,6 +1495,10 @@ kubectl exec -it <backend-pod> -n names-app -- env | grep DATABASE
 
 **Description**: Deploy Nginx frontend with external access
 
+**Status**: ✅ COMPLETED
+
+**Note**: Application is accessible at http://localhost:30080 due to port forwarding configuration in Vagrantfile (30080:30080). Frontend successfully proxies API requests to backend service.
+
 **Steps**:
 1. Apply frontend Deployment: `kubectl apply -f k8s/frontend-deployment.yaml`
 2. Apply frontend Service: `kubectl apply -f k8s/frontend-service.yaml`
@@ -1527,13 +1531,28 @@ vagrant ssh k3s-server -- ip addr show eth1 | grep "inet "
 ```
 
 **Acceptance Criteria**:
-- [ ] Deployment `frontend` shows 1/1 replica ready
-- [ ] Frontend pod in Running status
-- [ ] Service `frontend-service` created with NodePort
-- [ ] NodePort in range 30000-32767
-- [ ] Application accessible via http://<VM_IP>:<NODE_PORT>
-- [ ] Frontend can communicate with backend
-- [ ] No error events
+- [x] Deployment `frontend` shows 1/1 replica ready
+- [x] Frontend pod in Running status (on k3s-server)
+- [x] Service `frontend-service` created with NodePort (ClusterIP: 10.43.139.97)
+- [x] NodePort: 30080 (mapped via Vagrantfile port forwarding)
+- [x] Application accessible via http://localhost:30080
+- [x] Frontend can communicate with backend (API returns `{"names":[]}`)
+- [x] No error events
+
+**Verification Results**:
+```
+NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/frontend   1/1     1            1           2m
+
+NAME                       READY   STATUS    RESTARTS   AGE
+pod/frontend-99fd98d5b-l4hmm   1/1     Running   0          2m52s
+
+NAME                       TYPE       CLUSTER-IP     PORT(S)        
+service/frontend-service   NodePort   10.43.139.97   80:30080/TCP
+
+Application accessible at: http://localhost:30080
+API test: curl http://localhost:30080/api/names → {"names":[]}
+```
 
 **Browser Testing**:
 1. Open browser to `http://192.168.56.10:<NODE_PORT>`
