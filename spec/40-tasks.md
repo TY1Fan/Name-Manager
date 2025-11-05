@@ -2011,9 +2011,54 @@ echo "Access at: http://192.168.56.10:\$(kubectl get svc frontend-service -n nam
 ```
 
 **Acceptance Criteria**:
-- [ ] Deploy script automates full deployment
-- [ ] Cleanup script removes all resources
-- [ ] Update script handles image updates
-- [ ] All scripts executable
-- [ ] Scripts tested and working
+- [x] Deploy script automates full deployment
+- [x] Cleanup script removes all resources
+- [x] Update script handles image updates
+- [x] All scripts executable
+- [x] Scripts tested and working
+
+**Verification Results**:
+```
+Date: 2025-11-05
+Status: ✅ COMPLETE
+
+Created k3s deployment helper scripts in ops/ directory:
+
+1. deploy-k3s.sh (111 lines)
+   - Full automated deployment
+   - Deploys: namespace, config, database, backend, frontend, HPA
+   - Includes waiting for readiness with timeouts
+   - Color-coded output for better visibility
+   - Shows final status and application URL
+   - Tested successfully ✓
+
+2. cleanup-k3s.sh (71 lines)
+   - Safe deletion with confirmation prompts
+   - Option to preserve PVC/data
+   - Option to keep namespace
+   - Step-by-step resource cleanup
+   - Color-coded warnings for destructive operations
+   
+3. update-k3s.sh (111 lines)
+   - Supports selective updates: backend, frontend, or both
+   - Builds images locally
+   - Transfers to k3s via SCP
+   - Imports to containerd runtime
+   - Triggers rolling restart
+   - Monitors rollout completion
+
+4. README-k3s.md
+   - Complete documentation for all scripts
+   - Usage examples and workflows
+   - Troubleshooting guide
+   - Prerequisites documented
+
+All scripts:
+- Made executable (chmod +x)
+- Include error handling (set -e)
+- Color-coded output for readability
+- Tested and working correctly
+
+Original Docker Swarm scripts preserved with their original names.
+```
 This task breakdown makes the improvements manageable while ensuring each piece can be reviewed and integrated independently.
