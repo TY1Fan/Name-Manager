@@ -14,6 +14,10 @@ Vagrant.configure("2") do |config|
     # Private network for cluster communication
     server.vm.network "private_network", ip: "192.168.56.10"
     
+    # Port forwarding for kubectl access from laptop
+    # Forward host:6443 -> guest:6443 (k3s API server)
+    server.vm.network "forwarded_port", guest: 6443, host: 6443
+    
     # Port forwarding for accessing NodePort services
     # Forward host:30080 -> guest:30080 (typical NodePort range 30000-32767)
     server.vm.network "forwarded_port", guest: 30080, host: 30080
