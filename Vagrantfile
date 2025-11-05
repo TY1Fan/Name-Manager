@@ -60,23 +60,34 @@ Vagrant.configure("2") do |config|
     SHELL
   end
   
-  # Optional: k3s Agent (Worker Node)
-  # Uncomment the section below if you want a multi-node cluster
-  # You'll need to join this agent to the server using a token
-  
-  # config.vm.define "k3s-agent", autostart: false do |agent|
-  #   agent.vm.hostname = "k3s-agent"
-  #   agent.vm.network "private_network", ip: "192.168.56.11"
-  #   
-  #   agent.vm.provider "virtualbox" do |vb|
-  #     vb.name = "k3s-agent"
-  #     vb.memory = "2048"
-  #     vb.cpus = 2
-  #   end
-  #   
-  #   # Agent will need to join the server using K3S_TOKEN and K3S_URL
-  #   # agent.vm.provision "shell", inline: <<-SHELL
-  #   #   curl -sfL https://get.k3s.io | K3S_URL=https://192.168.56.10:6443 K3S_TOKEN=<token> sh -
-  #   # SHELL
-  # end
+  # k3s Agent (Worker Node) - Multi-node cluster
+  config.vm.define "k3s-agent", autostart: false do |agent|
+    agent.vm.hostname = "k3s-agent"
+    agent.vm.network "private_network", ip: "192.168.56.11"
+    
+    agent.vm.provider "virtualbox" do |vb|
+      vb.name = "k3s-agent"
+      vb.memory = "2048"  # 2GB for worker node
+      vb.cpus = 2
+    end
+    
+    # Join k3s cluster as agent (worker node)
+    agent.vm.provision "shell", inline: <<-SHELL
+      # Update system
+      apt-get update
+      
+      # Install k3s agent
+      echo "Installing k3s agent and joining cluster..."
+      curl -sfL https://get.k3s.io | K3S_URL=https://192.168.56.10:6443 K3S_TOKEN=K106c3fe74780453adbdcbe3a2111afbdfd22aabc60a349f7bc34f547b95aca41bf::server:cc15013299efec07ab51a374f3de5eac sh -
+      
+      # Wait for agent to join
+      echo "Waiting for agent to join cluster..."
+      sleep 15
+      
+      # Check k3s-agent service status
+      systemctl status k3s-agent --no-pager
+      
+      echo "k3s agent installation complete!"
+    SHELL
+  end
 end
