@@ -1026,10 +1026,10 @@ kubectl apply -f k8s/frontend-service.yaml --dry-run=client -n names-app
 
 ---
 
-### Task 2.12: Verify All Manifests with Dry-Run
+### Task 2.11: Verify All Manifests with Dry-Run
 **Estimated Time**: 30 minutes
 **Priority**: HIGH
-**Depends On**: All Phase 2 tasks
+**Depends On**: All Phase 2 tasks (2.1-2.10)
 
 **Description**: Validate all Kubernetes manifests before deployment
 
