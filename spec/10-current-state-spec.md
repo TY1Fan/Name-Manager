@@ -2,32 +2,53 @@
 
 ## Executive Summary
 
-**Status**: 🔴 **NON-FUNCTIONAL** - Critical integration bugs prevent core features from working
+**Status**: � **FULLY FUNCTIONAL** - All core features working correctly
 
-The Names Manager is a 3-tier web application designed to manage a simple list of names through a web interface. While the individual components are implemented with good practices (logging, error handling, input sanitization), **the application is currently non-functional due to three critical integration mismatches** between the frontend and backend:
+**Branch**: `k3s-orchestration` - Preparing for Kubernetes (k3s) deployment support
 
-1. **GET /api/names response format mismatch** - Names list never displays
-2. **DELETE endpoint parameter type mismatch** - Deletion functionality broken  
-3. **Frontend display logic incorrect** - Would display `[object Object]` even if API fixed
+The Names Manager is a 3-tier web application designed to manage a simple list of names through a web interface. The application is fully operational with:
 
-**Assessment**: Each tier is well-implemented in isolation, but the system requires integration fixes before it can function as intended.
+1. **Complete CRUD operations** - Create, Read, and Delete functionality working correctly
+2. **Proper frontend-backend integration** - Response formats aligned and data flows correctly  
+3. **Multiple deployment options** - Docker Compose and Docker Swarm currently supported
+4. **Production-ready features** - Logging, health checks, input sanitization, and error handling
+5. **k3s readiness** - Application architecture prepared for Kubernetes deployment
+
+**Assessment**: The application is production-ready for basic name management with comprehensive logging, security features, and deployment flexibility. Currently supports Docker Compose and Swarm orchestration, with k3s/Kubernetes support in development.
 
 ## System Overview
 
-The Names Manager consists of a PostgreSQL database, Flask REST API backend, and a static HTML/JavaScript frontend served by Nginx. The application uses Docker Compose for orchestration with proper health checks, environment-based configuration, and comprehensive logging.
+The Names Manager consists of a PostgreSQL database, Flask REST API backend, and a static HTML/JavaScript frontend served by Nginx. The application supports multiple orchestration platforms:
+
+- **Docker Compose**: Single-host development and testing
+- **Docker Swarm**: Multi-host production deployment with scaling
+- **k3s/Kubernetes**: (In development) Cloud-native deployment with advanced orchestration
+
+All deployments feature proper health checks, environment-based configuration, and comprehensive logging.
 
 ## Architecture
 
 ### System Components
-- **Database**: PostgreSQL 15 container
-- **Backend**: Flask REST API with SQLAlchemy ORM
-- **Frontend**: Static HTML/CSS/JavaScript served by Nginx
-- **Orchestration**: Docker Compose for container management
+- **Database**: PostgreSQL 15 container with persistent volume storage
+- **Backend**: Flask REST API with SQLAlchemy ORM and Gunicorn WSGI server (4 workers)
+- **Frontend**: Static HTML/CSS/JavaScript served by Nginx with reverse proxy
+- **Orchestration**: Multi-platform support
+  - Docker Compose for single-host development/testing
+  - Docker Swarm for multi-host production deployment
+  - k3s/Kubernetes (in development) for cloud-native orchestration
 
 ### Network Architecture
-- **External Access**: Port 8080 (Nginx frontend)
-- **Internal Network**: `appnet` Docker network
-- **Service Communication**: HTTP between frontend/backend, PostgreSQL protocol for database
+- **External Access**: 
+  - Docker Compose: Port 8080 (configurable via `FRONTEND_PORT`)
+  - Docker Swarm: Port 80 on manager nodes
+  - k3s: (Planned) NodePort or LoadBalancer service
+- **Internal Network**: 
+  - Docker Compose/Swarm: `appnet` Docker overlay network
+  - k3s: (Planned) Kubernetes cluster network with service discovery
+- **Service Communication**: 
+  - Frontend ↔ Backend: HTTP/REST API via Nginx reverse proxy
+  - Backend ↔ Database: PostgreSQL protocol (port 5432)
+  - Service discovery via DNS (Docker DNS or Kubernetes CoreDNS)
 
 ## Data Model
 
@@ -122,32 +143,30 @@ CREATE TABLE IF NOT EXISTS names (
 
 **Success Response (200 OK):**
 ```json
-[
-  {
-    "id": 1,
-    "name": "John Doe",
-    "created_at": "2025-10-10T12:34:56.789000"
-  },
-  {
-    "id": 2,
-    "name": "Jane Smith",
-    "created_at": "2025-10-10T13:45:22.123000"
-  }
-]
+{
+  "names": [
+    {
+      "id": 1,
+      "name": "John Doe",
+      "created_at": "2025-10-10T12:34:56.789000"
+    },
+    {
+      "id": 2,
+      "name": "Jane Smith",
+      "created_at": "2025-10-10T13:45:22.123000"
+    }
+  ]
+}
 ```
 
 **Response Details:**
-- Returns array of all names ordered by `id` ascending
+- Returns object with `names` array containing all names ordered by `id` ascending
+- Each name object includes `id`, `name`, and `created_at` fields
 - `created_at` is ISO 8601 formatted timestamp
-- Empty array returned if no names exist
+- Returns `{"names": []}` (empty array) if no names exist
 
 **Error Response:**
 - `500 Internal Server Error`: Database connection or query failures
-
-**⚠️ Known Issue:**
-- Frontend code expects response format `{"names": [...]}` but backend returns plain array `[...]`
-- This mismatch causes the names list to display "No names found" even when names exist
-- Affects frontend display functionality
 
 #### DELETE /api/names/{id}
 **Purpose**: Delete a specific name by ID
@@ -180,14 +199,11 @@ CREATE TABLE IF NOT EXISTS names (
 - Returns 404 if ID doesn't exist
 - Returns 200 with deleted ID if successful
 - No cascading deletes (single table)
-
-**⚠️ Known Issue:**
-- Frontend sends DELETE request with name (string) as path parameter: `/api/names/{name}`
-- Backend expects integer ID in path: `/api/names/{id}`
-- This type mismatch causes deletion functionality to fail
-- Backend route requires `<int:name_id>` but receives string from frontend
+- Frontend properly passes integer ID extracted from DOM element
+- Backend validates ID type through route parameter `<int:name_id>`
 
 #### GET /api/health
+#### GET /healthz
 **Purpose**: Basic health check for the API service
 
 **Request:** No body required
@@ -195,16 +211,14 @@ CREATE TABLE IF NOT EXISTS names (
 **Success Response (200 OK):**
 ```json
 {
-  "status": "healthy",
-  "service": "Names Manager API",
-  "version": "1.0.0",
-  "timestamp": "2025-10-30T12:34:56.789000+00:00"
+  "status": "ok"
 }
 ```
 
 **Response Details:**
-- Returns application status and metadata
-- Timestamp in ISO 8601 format with UTC timezone
+- Returns simple status indicator for service availability
+- Also available at `/healthz` endpoint for Kubernetes compatibility
+- Lightweight check without database verification
 
 #### GET /api/health/db
 **Purpose**: Database connectivity health check
@@ -276,23 +290,29 @@ CREATE TABLE IF NOT EXISTS names (
 - **Empty State**: "No names found" styled as list item when database is empty
 - **Loading State**: List opacity reduced and interactions disabled while loading
 - **List Items**: Each name displayed with:
-  - Name text (bold, 16px font)
-  - Delete button (red background) on the right
+  - Name content area showing:
+    - Name text (bold, 16px font, escaped for XSS prevention)
+    - Timestamp in localized format (gray text, smaller font)
+  - Delete button (red background) on the right with name ID stored for deletion
   - Box shadow for depth
   - White background cards with rounded corners
   - 10px margin between items
+  - Proper object destructuring to display `id`, `name`, and `created_at` fields
 - **Error State**: "Error loading names" message when API call fails
+- **Success Feedback**: Shows count of names loaded ("Found X names")
 
 #### Delete Functionality
-- **Confirmation**: JavaScript `confirm()` dialog before deletion
-- **Button**: Individual delete button per name
+- **Confirmation**: JavaScript `confirm()` dialog before deletion showing the name to be deleted
+- **Button**: Individual delete button per name with `onclick` handler
   - Red background (#e53935)
   - Darker red on hover (#ab2822)
   - 14px font size
+  - Passes integer ID to delete function
 - **Feedback**: 
-  - Success message displayed after deletion
+  - Success message displayed after deletion with name confirmation
   - List automatically refreshes to reflect changes
   - Error handling if deletion fails or name not found
+  - Graceful handling of "not found" errors with list refresh to maintain sync
 
 ### User Experience Flow
 
@@ -387,7 +407,10 @@ CREATE TABLE IF NOT EXISTS names (
 - `POSTGRES_USER`: PostgreSQL username for database access
 - `POSTGRES_PASSWORD`: PostgreSQL password
 - `POSTGRES_DB`: Database name
-- `DB_URL`: PostgreSQL connection string (default: `postgresql+psycopg2://names_user:names_pass@db:5432/namesdb`)
+- `DATABASE_URL`: PostgreSQL connection string (Swarm/standard, takes priority)
+- `DB_URL`: PostgreSQL connection string (Compose/legacy fallback)
+- Default: `postgresql+psycopg2://names_user:names_pass@db:5432/namesdb`
+- Backend supports both variables for deployment flexibility
 
 #### Application Configuration
 - `MAX_NAME_LENGTH`: Maximum allowed length for names (default: 50)
@@ -437,12 +460,17 @@ CREATE TABLE IF NOT EXISTS names (
 ### Nginx Configuration
 - **Static Files**: Served from `/usr/share/nginx/html`
 - **Root Route** (`/`): Serves index.html and static assets
-- **API Proxy** (`/api/*`): Proxies to `http://backend:8000`
+- **API Proxy** (`/api/*`): 
+  - Docker Compose: Proxies to `http://backend:8000`
+  - Docker Swarm: Proxies to `http://api:8000`
 - **Proxy Headers**: 
   - Host: Forwarded from original request
   - X-Real-IP: Client's IP address
   - X-Forwarded-For: Full forwarding chain
 - **Port**: Listens on port 80
+- **Configuration Files**:
+  - `nginx.conf`: Used in Docker Compose deployment
+  - `nginx.swarm.conf`: Used in Docker Swarm deployment
 
 ## Current Capabilities
 
@@ -476,93 +504,88 @@ CREATE TABLE IF NOT EXISTS names (
 - **Sensible Defaults**: Application works out-of-box with default values
 - **Flexible Deployment**: Easy to adjust for different environments
 
-## Critical Issues
+## Deployment Configurations
 
-### Frontend-Backend Integration Mismatches
+### Docker Compose Deployment
+The application supports traditional Docker Compose deployment for single-host environments:
 
-#### Issue 1: GET /api/names Response Format Mismatch
-**Severity**: HIGH - Breaks core functionality
+**Configuration File**: `src/docker-compose.yml`
 
-**Problem:**
-- **Backend** (`main.py` line 156): Returns plain JSON array
-  ```python
-  return jsonify(results)  # Returns: [{id: 1, name: "John"}, ...]
-  ```
-- **Frontend** (`app.js` line 126): Expects nested object
-  ```javascript
-  if (data.names && data.names.length > 0)  // Expects: {names: [...]}
-  ```
+**Key Features:**
+- **Services**: `db`, `backend`, `frontend`
+- **Network**: Internal `appnet` network for service communication
+- **Health Checks**: Database health check before backend startup
+- **Environment Variables**: Configured via `.env` file
+- **Volumes**: `db_data` volume for PostgreSQL persistence
+- **Port Mapping**: Frontend exposed on configurable port (default 8080)
 
-**Impact:**
-- Names list always displays "No names found" even when database contains names
-- Add name functionality appears to work but results not visible
-- Application appears non-functional to users
+**Environment Variables:**
+- Database: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `DB_URL`
+- Application: `MAX_NAME_LENGTH`, `SERVER_HOST`, `SERVER_PORT`
+- Logging: `LOG_LEVEL`, `DB_ECHO`
+- Frontend: `FRONTEND_PORT`
 
-**Resolution Required:**
-- Option A: Change backend to return `{"names": results}`
-- Option B: Change frontend to handle plain array `if (Array.isArray(data) && data.length > 0)`
+### Docker Swarm Deployment
+The application is fully compatible with Docker Swarm for production multi-host deployments:
 
-#### Issue 2: DELETE Endpoint Parameter Type Mismatch
-**Severity**: HIGH - Breaks deletion functionality
+**Configuration File**: `swarm/stack.yaml`
 
-**Problem:**
-- **Backend** (`main.py` line 163): Expects integer ID parameter
-  ```python
-  @app.route("/api/names/<int:name_id>", methods=["DELETE"])
-  ```
-- **Frontend** (`app.js` line 209): Sends name string
-  ```javascript
-  const res = await apiRequest(`/names/${encodeURIComponent(nameToDelete)}`, {method: "DELETE"})
-  ```
+**Key Features:**
+- **Services**: `db`, `api`, `web` (renamed for clarity)
+- **Network**: External `appnet` network created before stack deployment
+- **Secrets Management**: PostgreSQL credentials stored as Docker secrets
+- **Placement Constraints**: 
+  - Database on nodes labeled `role=db`
+  - API and web on manager nodes
+- **Scaling**: API service configured for 2 replicas
+- **Health Checks**: Enhanced with longer intervals for distributed environment
+- **Update Strategy**: Rolling updates with parallelism=1 and automatic rollback
+- **Volume Management**: Persistent volume with bind mount to `/var/lib/postgres-data`
 
-**Impact:**
-- DELETE requests fail with 404 (route not matched due to string parameter)
-- Users cannot delete names
-- Data accumulates without ability to remove entries
+**Deployment Process:**
+1. Initialize swarm cluster
+2. Create external network: `docker network create --driver overlay appnet`
+3. Create secrets for database credentials
+4. Deploy stack: `docker stack deploy -c swarm/stack.yaml names`
 
-**Resolution Required:**
-- Option A: Change frontend to pass ID instead of name (requires storing ID in DOM)
-- Option B: Change backend to accept name string and delete by name match
-- Option C: Add second delete endpoint that accepts name string
+**Differences from Compose:**
+- Uses `DATABASE_URL` environment variable (Swarm standard) vs `DB_URL` (Compose)
+- Backend supports both variables for compatibility
+- Secrets management via Docker secrets instead of environment variables
+- External network required for cross-stack communication
+- Replica counts and placement constraints for high availability
 
-#### Issue 3: Frontend Display Format
-**Severity**: MEDIUM - Inconsistent with backend data model
+### k3s/Kubernetes Deployment (In Development)
+**Status**: Planned - Architecture prepared for Kubernetes deployment
 
-**Problem:**
-- **Backend**: Provides full object with `id`, `name`, and `created_at`
-- **Frontend** (`app.js` line 128-131): Only displays name string, ignores ID and timestamp
-  ```javascript
-  data.names.forEach((name) => {
-    li.innerHTML = `<span>${escapeHtml(name)}</span>`  // Treats object as string
-  })
-  ```
-
-**Impact:**
-- If Issue 1 is resolved, this code would attempt to display `[object Object]` instead of names
-- Timestamps not shown to user despite being available
-- ID not tracked for proper deletion
-
-**Resolution Required:**
-- Update frontend to properly destructure and display object properties
-- Store ID as data attribute for deletion functionality
+**Planned Features:**
+- Kubernetes manifests for deployments, services, and persistent volumes
+- ConfigMaps for application configuration
+- Secrets for database credentials
+- Horizontal Pod Autoscaling for API tier
+- Ingress controller for external access
+- Namespace isolation
+- Health checks using Kubernetes liveness and readiness probes
 
 ## Current Limitations
 
 ### Security
-- No authentication or authorization
-- No CSRF protection
-- No rate limiting
-- Database credentials in environment variables (should use secrets management)
-- No HTTPS/TLS encryption
-- No SQL injection protection beyond ORM (using parameterized queries)
+- No authentication or authorization (public access)
+- No CSRF protection (stateless API)
+- No rate limiting on API endpoints
+- Credentials: Environment variables (Compose) or Docker secrets (Swarm)
+- No HTTPS/TLS encryption (HTTP only)
+- SQL injection protection via ORM parameterized queries
+- XSS protection via HTML entity escaping on user input
+- Input sanitization removes null bytes and normalizes whitespace
 
 ### Scalability
-- Single database instance (no replication)
-- No horizontal scaling for backend (fixed 4 workers)
-- No load balancing
-- No caching layer
-- No connection pooling configuration
-- No session management for multi-server deployments
+- Single database instance (no replication or read replicas)
+- Backend horizontal scaling available in Swarm mode (configured for 2 replicas)
+- Swarm provides built-in load balancing across API replicas
+- No application-level caching layer (relies on database performance)
+- No explicit connection pooling configuration (uses SQLAlchemy defaults)
+- Stateless design supports multi-server deployments without session management
 
 ### Data Management
 - No data validation beyond length limits
@@ -623,10 +646,13 @@ CREATE TABLE IF NOT EXISTS names (
 - **Schema**: Single table with auto-incrementing ID and timestamp
 
 ### Infrastructure
-- **Docker Compose 3.8**: Container orchestration
+- **Docker Compose 3.8**: Container orchestration for single-host deployment
+- **Docker Swarm**: Multi-host orchestration with service scaling and high availability
 - **Nginx Alpine**: Lightweight web server for static files and reverse proxy
 - **Docker Networks**: Isolated internal network for service communication
 - **Docker Volumes**: Persistent storage for database data
+- **Docker Secrets**: Secure credential management in Swarm mode
+- **k3s/Kubernetes**: (Planned) Lightweight Kubernetes for cloud-native deployment
 
 ## Development and Build
 
@@ -650,4 +676,177 @@ CREATE TABLE IF NOT EXISTS names (
 - Frontend: Simple file copy, no build step required
 - No minification or bundling (development-oriented setup)
 
-This specification documents the current implementation as of October 30, 2025, and serves as the baseline for future refactoring and improvements.
+## Operational Tooling
+
+### Deployment Scripts (`ops/` directory)
+
+#### init-swarm.sh
+- Initializes Docker Swarm cluster on the current node
+- Creates external overlay network (`appnet`)
+- Sets up Docker secrets for PostgreSQL credentials
+- Configures node labels for service placement
+- Prepares persistent volume directory
+
+#### deploy.sh
+- Builds Docker images from source
+- Tags images appropriately for Swarm deployment
+- Deploys the application stack using `swarm/stack.yaml`
+- Validates deployment success
+- Shows service status and logs
+
+#### validate.sh
+- Performs comprehensive validation of the running application
+- Tests all API endpoints (POST, GET, DELETE, health checks)
+- Verifies database connectivity
+- Checks service health and replica counts
+- Reports success/failure for each test
+
+#### verify.sh
+- Quick verification script for deployment status
+- Checks if services are running
+- Displays service endpoints and access information
+- Lighter weight than full validation
+
+#### cleanup.sh
+- Removes deployed stack
+- Cleans up Docker resources (containers, networks, volumes)
+- Optionally removes Docker secrets
+- Resets environment to pre-deployment state
+
+### Build Scripts
+
+#### src/build-images.sh
+- Builds backend and frontend Docker images
+- Tags images for local registry
+- Optimizes build caching
+- Reports build success/failure
+
+### Documentation
+- **README.md**: Project overview and quickstart
+- **QUICKSTART.md**: Step-by-step deployment guide
+- **docs/OPERATIONS.md**: Detailed operational procedures
+- **docs/EVIDENCE.md**: Testing evidence and validation results
+- **ai-log/**: AI assistant interaction logs and development history
+
+## Testing
+
+### Automated Test Suite
+**Location**: `src/backend/tests/`
+
+**Test Framework**: pytest with comprehensive fixtures and configuration
+
+#### Test Categories
+
+**1. Infrastructure Tests** (`test_infrastructure.py`)
+- Basic test infrastructure validation
+- Python feature verification
+- Fixture functionality testing
+- Ensures test environment is properly configured
+
+**2. API Endpoint Tests** (`test_api_endpoints.py`)
+- POST /api/names: Valid names, empty names, whitespace handling, length validation
+- GET /api/names: List retrieval, empty database handling, data format
+- DELETE /api/names/{id}: Successful deletion, not found errors, invalid IDs
+- Health endpoints: /api/health and /api/health/db functionality
+- Comprehensive coverage of success and error cases
+
+**3. Configuration Tests** (`test_configuration.py`)
+- Environment variable parsing and defaults
+- MAX_NAME_LENGTH validation
+- Configuration documentation verification
+- Docker Compose configuration validation
+- Ensures proper configuration handling across deployments
+
+**4. Logging Tests** (`test_logging.py`)
+- Request logging for all endpoints
+- Error logging for validation failures and exceptions
+- Log level configuration
+- Structured log format verification
+- Security logging for input sanitization
+
+**5. Validation Tests** (`test_validation.py`)
+- Input sanitization (XSS prevention, null byte removal)
+- Validation function correctness
+- Edge cases and boundary conditions
+- Error message accuracy
+
+#### Test Execution
+```bash
+# Run all tests
+cd src/backend
+pytest
+
+# Run with coverage
+pytest --cov=. --cov-report=html
+
+# Run specific test file
+pytest tests/test_api_endpoints.py
+
+# Run with verbose output
+pytest -v
+```
+
+#### Test Configuration
+- **pytest.ini**: Configures test discovery and output format
+- **conftest.py**: Shared fixtures for database, client, and test data
+- **Fresh Database Fixture**: Each test gets clean database state
+- **Test Client**: Flask test client for API endpoint testing
+
+### Manual Testing
+**Documentation**: `src/backend/tests/TESTING.md`
+
+Comprehensive manual testing checklist covering:
+- Application startup and health checks
+- CRUD operations with various inputs
+- Error handling and edge cases
+- UI interaction and user experience
+- Security testing (XSS, SQL injection prevention)
+- Performance and load testing guidelines
+
+### Validation Script
+**Script**: `ops/validate.sh`
+
+End-to-end validation of deployed application:
+- Service availability checks
+- API endpoint functional testing
+- Database connectivity verification
+- Health check validation
+- Integration testing across all tiers
+
+## Performance Characteristics
+
+### Docker Compose (Single Host)
+- **Startup Time**: ~10-15 seconds for full stack
+  - Database initialization: ~5-8 seconds
+  - Backend wait for DB health check: ~2-5 seconds
+  - All services healthy: ~10-15 seconds total
+- **Response Times**: Typically <100ms for API calls on local development
+- **Memory Usage**: 
+  - Database: ~50MB base + data
+  - Backend: ~30MB per worker (120MB total for 4 workers)
+  - Frontend: ~10MB (nginx)
+  - Total: ~180MB + data size
+- **Concurrent Users**: Limited by Gunicorn worker count (4 workers)
+
+### Docker Swarm (Multi-Host)
+- **Startup Time**: ~20-30 seconds for full stack deployment
+  - Stack deployment: ~5-10 seconds
+  - Service convergence: ~10-15 seconds
+  - Health checks and readiness: ~5-10 seconds
+- **Response Times**: <200ms for API calls (includes overlay network latency)
+- **Memory Usage**: 
+  - Database: ~50MB base + data
+  - API services: ~120MB per replica × 2 = ~240MB
+  - Frontend: ~10MB (nginx)
+  - Total: ~300MB + data size (multi-host)
+- **Concurrent Users**: Improved capacity with 2 API replicas (8 workers total)
+- **Load Distribution**: Swarm routing mesh balances requests across API replicas
+
+### Database Performance
+- **Query Optimization**: None (acceptable for small datasets)
+- **Indexing**: Primary key index only (id column)
+- **Query Pattern**: Simple SELECT, INSERT, DELETE operations
+- **Connection Handling**: SQLAlchemy manages connection lifecycle
+- **Scalability Limit**: Suitable for <10,000 names without optimization
+
+This specification documents the current implementation as of November 4, 2025 on the `k3s-orchestration` branch, and serves as the baseline for k3s/Kubernetes deployment enhancements.

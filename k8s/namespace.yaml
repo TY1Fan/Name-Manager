@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: names-app
+  labels:
+    app: names-manager
+    environment: development
