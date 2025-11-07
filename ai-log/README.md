@@ -3,7 +3,7 @@
 Github Copilot 
 
 ## Model version:
-Claude Sonnet 4
+Claude Sonnet 4.5
 
 ## Timestamps:
 Day 1:
@@ -19,7 +19,7 @@ Day 2:
 Github Copilot 
 
 ## Model version:
-Claude Sonnet 4
+Claude Sonnet 4.5
 
 ## Timestamps:
 Day 1:
@@ -34,3 +34,23 @@ Day 2:
 Day 3:
 20251031-130000
 20251031-160000
+
+## For HW6:
+## Tool(s) used:
+Github Copilot 
+
+## Model version:
+Claude Sonnet 4.5
+
+## Timestamps:
+Day 1:
+20251104-140000
+20251104-220000
+
+Day 2:
+20251105-100000
+20251105-190000
+
+Day 3:
+20251107-140500
+20251107-152000
