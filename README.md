@@ -13,12 +13,15 @@ A secure, containerized 3-tier web application for managing personal contact nam
 
 ## Architecture
 
-This application supports two deployment modes:
+This application supports three deployment modes:
 
 - **Development (Single-Host)**: Uses `src/docker-compose.yml` for local development with Docker Compose
-- **Production (Multi-Host)**: Uses `swarm/stack.yaml` for distributed deployment with Docker Swarm
+- **Production (Docker Swarm)**: Uses `swarm/stack.yaml` for distributed deployment with Docker Swarm
   - **Manager VM** (192.168.56.10): Runs web and API services
   - **Worker VM** (192.168.56.11): Runs database service with persistent storage
+- **Production (Kubernetes/k3s)**: Uses `k8s/*.yaml` manifests for Kubernetes deployment
+  - **k3s-server** (192.168.56.10): Control plane node running all application pods
+  - **k3s-agent** (192.168.56.11): Worker node (available for scaling)
 
 ## Prerequisites
 
@@ -33,6 +36,7 @@ This application supports two deployment modes:
 - **VirtualBox** (version 6.1+ recommended)
 - **8GB RAM** minimum for VMs
 - **20GB disk space** for VM images
+- **kubectl** (for k3s deployment management)
 
 ## Local Development (Single-Host)
 
@@ -79,7 +83,7 @@ docker compose down
          Single Docker Host (Docker Compose)
 ```
 
-**Production (Multi-Host):**
+**Production (Docker Swarm - Multi-Host):**
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                     Docker Swarm Cluster                     │
@@ -102,12 +106,54 @@ docker compose down
 └──────────────────────────────┴───────────────────────────────┘
 ```
 
+**Production (Kubernetes/k3s - Multi-Node):**
+```
+┌──────────────────────────────────────────────────────────────┐
+│                      k3s Cluster                             │
+├──────────────────────────────┬───────────────────────────────┤
+│    k3s-server Node           │     k3s-agent Node            │
+│  (Control Plane)             │     (Worker)                  │
+│   (192.168.56.10)            │    (192.168.56.11)            │
+│                              │                               │
+│  ┌────────────────┐          │   Available for               │
+│  │   Frontend     │          │   scaling                     │
+│  │   (Nginx)      │          │                               │
+│  │   1 replica    │          │                               │
+│  │   NodePort     │          │                               │
+│  │   30080        │          │                               │
+│  └────────────────┘          │                               │
+│         ▲                    │                               │
+│         │                    │                               │
+│  ┌──────┴────────┐           │                               │
+│  │   Backend     │           │                               │
+│  │   (FastAPI)   │           │                               │
+│  │   2 replicas  │           │                               │
+│  │   + HPA       │           │                               │
+│  └───────────────┘           │                               │
+│         ▲                    │                               │
+│         │                    │                               │
+│  ┌──────┴────────┐           │                               │
+│  │   Database    │           │                               │
+│  │  (PostgreSQL) │           │                               │
+│  │  StatefulSet  │           │                               │
+│  │   1 replica   │           │                               │
+│  └───────────────┘           │                               │
+│         │                    │                               │
+│    PersistentVolume          │                               │
+│    (local-path)              │                               │
+│    /var/lib/rancher/k3s/     │                               │
+│    storage/pvc-*/            │                               │
+└──────────────────────────────┴───────────────────────────────┘
+```
+
 ### Components
 
 - **Frontend**: Nginx-served static HTML/JS/CSS with API proxying
 - **Backend**: FastAPI REST API with input validation and sanitization
 - **Database**: PostgreSQL 15 with persistent storage
-- **Security**: XSS prevention, input validation, health monitoring, Docker secrets
+- **Security**: XSS prevention, input validation, health monitoring
+- **Secrets Management**: Docker Secrets (Swarm) or Kubernetes Secrets (k3s)
+- **Auto-scaling**: HorizontalPodAutoscaler (k3s only)
 
 ### API Endpoints
 - `GET /api/names` - List all names
@@ -149,6 +195,13 @@ curl http://localhost:8080/api/names
 ./ops/verify.sh  # Automated verification
 curl http://localhost:8081/api/health
 curl http://localhost:8081/api/names
+```
+
+**For Production k3s (port 30080):**
+```bash
+kubectl get pods -n names-app
+curl http://localhost:30080/api/health
+curl http://localhost:30080/api/names
 ```
 
 **Test Checklist:**
@@ -232,6 +285,111 @@ Restart a service:
 ```bash
 vagrant ssh manager -c "docker service update --force names_<service>"
 ```
+
+---
+
+## Production Deployment (Kubernetes/k3s)
+
+For production deployment on a Kubernetes cluster using k3s:
+
+### Complete Deployment Workflow
+
+```bash
+# 1. Start VMs (k3s-server + k3s-agent)
+vagrant up
+
+# 2. Verify cluster is ready
+kubectl get nodes
+# Both nodes should show "Ready"
+
+# 3. Deploy application (automated)
+./ops/deploy-k3s.sh
+
+# 4. Verify deployment
+kubectl get all -n names-app
+curl http://localhost:30080/api/health/db
+
+# 5. Access application
+open http://localhost:30080
+
+# 6. Clean up (when done)
+./ops/cleanup-k3s.sh
+```
+
+**Access Points:**
+- **Web Interface**: http://localhost:30080
+- **API Health**: http://localhost:30080/api/health
+- **Database Health**: http://localhost:30080/api/health/db
+
+### Operations Scripts
+
+k3s-specific scripts are in the `ops/` directory:
+
+| Script | Purpose | Usage |
+|--------|---------|-------|
+| **deploy-k3s.sh** | Full automated deployment to k3s cluster | Run to deploy application |
+| **cleanup-k3s.sh** | Remove all resources safely (prompts before data deletion) | Run to clean up |
+| **update-k3s.sh** | Build new images and update deployments | Run to update application |
+
+See [`ops/README-k3s.md`](ops/README-k3s.md) for detailed documentation.
+
+### Pod Placement
+
+All pods run on **k3s-server** node (192.168.56.10) due to nodeSelector constraints:
+- **Frontend** (1 replica) - Nginx, NodePort 30080
+- **Backend** (2 replicas, auto-scales 2-5 via HPA) - FastAPI
+- **Database** (1 replica) - PostgreSQL 15 StatefulSet
+- **Persistent Storage**: k3s local-path provisioner at `/var/lib/rancher/k3s/storage/`
+
+### Kubernetes Resources
+
+All manifests are in the `k8s/` directory:
+
+| Resource | File | Description |
+|----------|------|-------------|
+| **Namespace** | namespace.yaml | Isolates application resources |
+| **ConfigMap** | configmap.yaml | Non-sensitive configuration |
+| **Secret** | secret.yaml | Database credentials |
+| **PVC** | database-pvc.yaml | 1Gi persistent volume claim |
+| **StatefulSet** | database-statefulset.yaml | PostgreSQL with persistent storage |
+| **Deployments** | backend-deployment.yaml<br>frontend-deployment.yaml | Backend API and frontend |
+| **Services** | database-service.yaml<br>backend-service.yaml<br>frontend-service.yaml | Internal and external networking |
+| **HPA** | backend-hpa.yaml | Auto-scaling for backend (2-5 replicas) |
+
+### Troubleshooting
+
+View pod logs:
+```bash
+kubectl logs -n names-app <pod-name>
+kubectl logs -n names-app -l app=backend --tail=50 -f
+```
+
+Check pod status:
+```bash
+kubectl get pods -n names-app -o wide
+kubectl describe pod <pod-name> -n names-app
+```
+
+Check events:
+```bash
+kubectl get events -n names-app --sort-by='.lastTimestamp'
+```
+
+Restart deployments:
+```bash
+kubectl rollout restart deployment/backend -n names-app
+kubectl rollout restart deployment/frontend -n names-app
+```
+
+Check resource usage:
+```bash
+kubectl top nodes
+kubectl top pods -n names-app
+```
+
+For comprehensive operations guide, see [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
+
+---
 
 ## Contributing
 
