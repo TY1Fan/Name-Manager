@@ -7,6 +7,20 @@ All notable changes to Names Managers are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2025-11-07
+
+### Added
+
+- Production ready multi-node distributed 3-tier web application orchestrated with lightweight Kubernetes (k3s).
+
+### Fixed
+
+N/A
+
+### Changed
+
+App now deployed with lightweight Kubernetes instead of Docker Swarm.
+
 ## [1.0.0] - 2025-11-01
 
 ### Added
