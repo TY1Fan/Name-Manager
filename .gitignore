@@ -11,3 +11,5 @@ k3s-config.yaml
 *.kubeconfig
 .kube/
 
+*.tar
+
